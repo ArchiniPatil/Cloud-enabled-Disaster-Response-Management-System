@@ -21,6 +21,7 @@ Updated 24 October 2026. The repository was initially empty. **The core applicat
 - [x] Real SNS SMS adapter with honest SUBMITTED/FAILED/UNKNOWN outcomes, bounded operator retries and disabled live sending by default.
 - [x] CDK definitions for network, private ECS/RDS, HTTPS ALB, Cognito, S3, secrets, queues, worker/migrator Lambdas, Scheduler, monitoring, budget, Amplify and ECR. Optional controlled pipeline and aggregate analytics stack.
 - [x] Separate migration/runtime database roles. Runtime DDL and audit-mutation denial are tested against PostgreSQL.
+- [x] Node-based local setup and npm startup without a Bash dependency; missing-environment and Docker guidance. Verified on Linux; native Windows verification remains pending.
 - [x] Docker image, CI verification, controlled deployment/cleanup scripts, database/operations/security/API documentation and OpenAPI contract.
 
 ## Validation evidence
@@ -46,7 +47,7 @@ See `TESTING.md` for commands and precise test boundaries. Test outcomes above d
 - Current regional price/quota/service verification and explicit approval before provisioning. Current pricing/documentation requests were network-denied; planning cost ranges are unverified allowances.
 - Live Cognito managed registration/MFA/recovery/refresh/revocation tests, RDS restore drill, S3 IAM/finalization tests, real queue/Lambda/Scheduler behavior and Location routes/maps.
 - India/recipient-country SMS sender/template registration, verified test numbers, spend cap and approved IAM before SMS activation. No real SMS has been sent.
-- Amplify source/manual publication, DNS/certificate setup, same-origin cookie/SSE proxy validation, and Git repository publication through an authorized workflow.
+- Amplify source/manual publication, DNS/certificate setup, same-origin cookie/SSE proxy validation. Source code has been published to the authorized GitHub repository; this does not deploy the application.
 
 ## Deliberate limits / incomplete advanced work
 

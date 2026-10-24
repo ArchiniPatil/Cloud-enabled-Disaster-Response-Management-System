@@ -11,7 +11,7 @@ Validation performed locally on 24 October 2026, using Node 24 on the host, Node
 | `npm run infra:check` | Synthesis plus private-network/encryption/MFA/queue/scheduler/budget/secret-output assertions passed |
 | `npm run infra:synth -- -c analytics=true -c pipeline=true --quiet` | Passed; optional resources defined only |
 | `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities reported |
-| `bash scripts/local-setup.sh` | Frozen reinstall, existing volume startup, repeatable migrations/seed passed |
+| `npm run setup:local` | Node-based setup: frozen reinstall, existing volume startup, repeatable migrations/seed passed on Linux |
 | `bash scripts/build-container.sh` | Image built with TLS verification intact using the managed proxy/CA |
 | `npm run dev:local` + `npm run smoke:local` | Passed from the saved local launcher; API, Vite and worker running |
 | Container HTTP smoke | Liveness, DB readiness, cookie sign-in/profile and scoped incident list passed |
@@ -45,6 +45,12 @@ The default browser tests use the separate development database and clearly labe
 Initial checks caught a type/import mismatch, a test-runner API change, a sign-in rate limit incorrectly counting ordinary session/config requests, a CloudFormation migration dependency cycle, and reopened incidents incorrectly treating previous dispatch as a current response. A final launch check also caught a changed dependency CLI path and environment-file propagation issue; the explicit `dev-local.mjs` launcher now forwards the loaded environment and passes a sign-in/database/logout smoke check. Each affected check was rerun after correction.
 
 Docker initially lacked the managed proxy DNS mapping and CA trust context. `build-container.sh` supplies the existing proxy hostname mapping and mounts the CA only at build time; npm signatures/integrity and TLS checks stay enabled. The proxy certificate and credentials are not copied into image layers. Plain `docker build` remains appropriate in an ordinary network; the helper supports this managed environment.
+
+## Windows local setup correction
+
+The reported Windows failure occurred before installation: PowerShell resolved `bash` to an unavailable WSL shell. `setup:local` now runs a Node script with no shell-specific environment assignments. It checks Docker, installs dependencies into the existing checkout, preserves an existing `.env`, creates it when absent, and prepares the demo and test databases. The development launcher invokes npm through Node without shell quoting and provides a useful message when `.env` is missing. Playwright passes `AUTH_MODE` through its environment configuration instead of POSIX command syntax.
+
+For this correction, setup, lint, typechecking, development startup, the database/session smoke check, and all three browser scenarios (including automatic server startup) passed on Linux. A missing-environment check from a directory containing spaces also passed. Native Windows execution remains unverified in this environment. The full unit/integration suite still contains a Bash-based paid-deployment guard test; Windows users need Git Bash for that suite, but not for local app setup/startup or browser tests.
 
 ## Remaining acceptance gates
 

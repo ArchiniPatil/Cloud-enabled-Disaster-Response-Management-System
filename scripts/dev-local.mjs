@@ -1,9 +1,20 @@
 import {loadEnvFile} from 'node:process';
 import {spawn} from 'node:child_process';
-loadEnvFile('.env');
+import {fileURLToPath} from 'node:url';
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
+try { loadEnvFile('.env'); } catch (error) {
+  console.error(error.code === 'ENOENT'
+    ? 'Local setup is incomplete: .env is missing. Run npm run setup:local successfully before starting the app.'
+    : `Cannot read .env: ${error.message}`);
+  process.exit(1);
+}
 if(process.env.AUTH_MODE!=='demo')throw new Error('dev:local requires AUTH_MODE=demo; use the separately reviewed cloud configuration for Cognito.');
+if (!process.env.npm_execpath) {
+  console.error('Start the application with npm run dev:local.');
+  process.exit(1);
+}
 const windows=process.platform==='win32';
-const child=spawn(windows?'npm.cmd':'npm',['run','dev'],{stdio:'inherit',env:{...process.env},detached:!windows,shell:windows});
+const child=spawn(process.execPath,[process.env.npm_execpath,'run','dev'],{stdio:'inherit',env:{...process.env},detached:!windows});
 for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{if(child.pid){try{if(windows)child.kill(signal);else process.kill(-child.pid,signal);}catch{/* Child already exited. */}}});
 child.on('error',()=>{console.error('Unable to start npm; check the Node/npm installation.');process.exitCode=1;});
 child.on('exit',code=>{process.exitCode=code??0;});

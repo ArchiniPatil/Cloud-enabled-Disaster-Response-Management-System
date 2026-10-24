@@ -8,12 +8,14 @@ This repository contains a working local workflow and AWS deployment definitions
 
 ## Run locally
 
-Prerequisites: Node.js 22+, npm, Docker with Compose, and Bash. On Windows, start Docker Desktop and run the commands from Git Bash (included with Git for Windows). On macOS/Linux, use a Bash-capable terminal. Extract the project ZIP and open a terminal inside the extracted project folder first. The environment was verified with Node 24 and PostgreSQL 16/PostGIS 3.5.
+Prerequisites: Node.js 22+, npm, and Docker with Compose. On Windows, start Docker Desktop with Linux containers and use PowerShell, Command Prompt, or Git Bash. The local setup and startup commands do not require Bash or a WSL shell. Extract the project ZIP and open a terminal inside the extracted project folder first. The environment was verified with Node 24 and PostgreSQL 16/PostGIS 3.5.
 
 ```sh
 npm run setup:local
 npm run dev:local
 ```
+
+Wait for setup to print **Local setup complete** before starting the app. Keep the development terminal open while using the application. If setup fails, fix that error and rerun it before attempting startup or tests; setup installs the missing tools and creates `.env`.
 
 The frontend listens on port **5173**, API on **4000**, and loopback-only PostGIS on **5432**. Use the clearly marked Demo Citizen, Authority, Rescuer, and Admin buttons. The local database password in `.env.example` is a disposable Docker development credential, never an AWS credential. Never expose this local configuration publicly.
 
@@ -45,7 +47,7 @@ bash scripts/build-container.sh
 npm audit --omit=dev --audit-level=high
 ```
 
-`npm test` uses a separate database ending in `_test` and deliberately resets **that test schema only**. `setup:local` creates it. Browser tests create labeled controlled incidents in the development database. They do not send SMS. Install Chromium with `npx playwright install --with-deps chromium` if no system Chromium is available.
+`npm test` uses a separate database ending in `_test` and deliberately resets **that test schema only**. `setup:local` creates it. Browser tests create labeled controlled incidents in the development database. They do not send SMS. Install Chromium with `npx playwright install chromium` (Windows/macOS) or `npx playwright install --with-deps chromium` (Linux) if no system Chromium is available. The paid-deployment guard test in `npm test` and the optional container/cloud helper scripts still require Bash; on Windows, run that suite from Git Bash with Git for Windows on PATH. Bash is not needed to set up or run the app, the smoke check, or the browser tests.
 
 ## Optional paid AWS reference deployment
 
