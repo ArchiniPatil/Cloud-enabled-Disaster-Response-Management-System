@@ -1,0 +1,7 @@
+{
+  "defaultTarget": "local",
+  "monthlyBudgetUsd": 0,
+  "allowPaidAwsDeployment": false,
+  "customDomainRequiredForEvaluation": false,
+  "reason": "User requested a $0 AWS budget and localhost/default-provider URLs for development and evaluation."
+}

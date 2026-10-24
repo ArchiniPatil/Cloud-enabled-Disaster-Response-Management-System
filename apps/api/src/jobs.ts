@@ -1,0 +1,326 @@
+import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { config } from "./config.js";
+import { pool, transaction, audit, type DB } from "./db.js";
+import { eligibleTeams } from "./policy.js";
+import { notifyControl } from "./incidents.js";
+import { escalationNeeded } from "../../../packages/core/src/domain.js";
+import { s3 } from "./evidence.js";
+const sns = new SNSClient({ region: config.AWS_REGION });
+export async function consumeEvent(event: {
+  id: string;
+  type: string;
+  payload: { incidentId?: string };
+}) {
+  await transaction(async (db) => {
+    if (
+      !(
+        await db.query(
+          "INSERT INTO processed_events(id) VALUES($1) ON CONFLICT DO NOTHING RETURNING id",
+          [event.id],
+        )
+      ).rowCount
+    )
+      return;
+    if (event.type === "INCIDENT_CREATED" && event.payload.incidentId) {
+      await notifyControl(db, event.payload.incidentId, 0);
+      await db.query(
+        `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key) SELECT n.incident_id,n.recipient_id,'SMS','sms:'||n.dedupe_key FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE n.incident_id=$1 AND n.channel='IN_APP' AND u.sms_enabled AND u.phone IS NOT NULL ON CONFLICT DO NOTHING`,
+        [event.payload.incidentId],
+      );
+    }
+    await audit(db, null, "EVENT_CONSUMED", "event", event.id, {
+      type: event.type,
+    });
+  });
+}
+export async function flushOutbox() {
+  const rows = (
+    await pool.query(
+      "SELECT id FROM outbox_events WHERE published_at IS NULL AND next_attempt<=now() ORDER BY created_at LIMIT 50",
+    )
+  ).rows;
+  for (const row of rows) {
+    await transaction(async (db) => {
+      const e = (
+        await db.query(
+          "SELECT * FROM outbox_events WHERE id=$1 AND published_at IS NULL AND next_attempt<=now() FOR UPDATE SKIP LOCKED",
+          [row.id],
+        )
+      ).rows[0];
+      if (!e) return;
+      try {
+        if (config.EVENT_TOPIC_ARN)
+          await sns.send(
+            new PublishCommand({
+              TopicArn: config.EVENT_TOPIC_ARN,
+              Message: JSON.stringify({
+                id: e.id,
+                type: e.type,
+                payload: e.payload,
+              }),
+            }),
+          );
+        else if (config.AUTH_MODE === "demo") await consumeEvent(e);
+        else throw new Error("Event topic missing");
+        await db.query(
+          "UPDATE outbox_events SET published_at=now(),attempts=attempts+1 WHERE id=$1",
+          [e.id],
+        );
+      } catch {
+        await db.query(
+          "UPDATE outbox_events SET attempts=attempts+1,next_attempt=now()+least(300,power(2,least(attempts,8))) * interval '1 second' WHERE id=$1",
+          [e.id],
+        );
+        console.error(
+          JSON.stringify({ event: "outbox_publish_failed", id: e.id }),
+        );
+      }
+    });
+  }
+}
+async function notifyTeam(
+  db: DB,
+  incidentId: string,
+  teamId: string,
+  stage: number,
+) {
+  await db.query(
+    `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key,status) SELECT $1,m.user_id,'IN_APP',$2||':'||m.user_id,'AVAILABLE' FROM team_memberships m JOIN user_profiles u ON u.id=m.user_id AND u.status='ACTIVE' WHERE m.team_id=$3 ON CONFLICT DO NOTHING`,
+    [incidentId, `eligible:${incidentId}:${stage}`, teamId],
+  );
+}
+export async function runEscalations() {
+  const due = (
+    await pool.query(
+      "SELECT id FROM escalation_executions WHERE completed_at IS NULL AND due_at<=now() ORDER BY due_at LIMIT 50",
+    )
+  ).rows;
+  for (const row of due)
+    await transaction(async (db) => {
+      const e = (
+        await db.query(
+          "SELECT * FROM escalation_executions WHERE id=$1 AND completed_at IS NULL AND due_at<=now() FOR UPDATE SKIP LOCKED",
+          [row.id],
+        )
+      ).rows[0];
+      if (!e) return;
+      const i = (
+        await db.query(
+          "SELECT i.*,p.radii_m,p.delays_seconds FROM incidents i JOIN escalation_policies p ON p.id=i.policy_id WHERE i.id=$1 FOR UPDATE OF i",
+          [e.incident_id],
+        )
+      ).rows[0];
+      if (!i) {
+        await db.query(
+          "UPDATE escalation_executions SET completed_at=now(),outcome='NO_POLICY' WHERE id=$1",
+          [e.id],
+        );
+        return;
+      }
+      const dispatched = !!(
+        await db.query(
+          "SELECT 1 FROM incident_assignments WHERE incident_id=$1 AND updated_at>=$2 AND status IN('DISPATCHED','EN_ROUTE','ARRIVED','IN_PROGRESS','COMPLETED')",
+          [i.id, i.response_cycle_started_at],
+        )
+      ).rowCount;
+      let outcome = "SATISFIED";
+      if (
+        (e.force_review &&
+          !["RESOLVED", "CANCELLED", "DUPLICATE", "UNABLE_TO_RESPOND"].includes(
+            i.status,
+          )) ||
+        escalationNeeded(i.severity, i.status, dispatched)
+      ) {
+        await notifyControl(db, i.id, e.stage);
+        if (e.stage > 0)
+          await db.query(
+            `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key,status) SELECT $1,u.supervisor_id,'IN_APP',$2||':'||u.supervisor_id,'AVAILABLE' FROM user_profiles u JOIN incident_departments d ON d.department_id=u.department_id WHERE d.incident_id=$1 AND u.supervisor_id IS NOT NULL ON CONFLICT DO NOTHING`,
+            [i.id, `supervisor:${i.id}:${e.stage}`],
+          );
+        const index = Math.min(e.policy_stage ?? e.stage, i.radii_m.length - 1);
+        const teams = await eligibleTeams(db, i.id, i.radii_m[index]);
+        for (const t of teams) await notifyTeam(db, i.id, t.id, e.stage);
+        outcome = teams.length
+          ? `ALERTED_${teams.length}_TEAMS`
+          : "NO_ELIGIBLE_TEAM";
+        const next = e.stage + 1;
+        if (index + 1 < i.radii_m.length) {
+          await db.query(
+            "INSERT INTO escalation_executions(incident_id,stage,due_at,policy_stage) VALUES($1,$2,now()+$3*interval '1 second',$4) ON CONFLICT DO NOTHING",
+            [
+              i.id,
+              next,
+              Math.max(
+                1,
+                i.delays_seconds[index + 1] - i.delays_seconds[index],
+              ),
+              index + 1,
+            ],
+          );
+          await db.query(
+            "UPDATE incidents SET escalation_state=$2 WHERE id=$1",
+            [i.id, teams.length ? "AWAITING_RESPONSE" : "NO_ELIGIBLE_TEAM"],
+          );
+        } else {
+          await db.query(
+            "UPDATE incidents SET escalation_state='REGIONAL_REVIEW_REQUIRED' WHERE id=$1",
+            [i.id],
+          );
+          outcome += ":REGIONAL_REVIEW_REQUIRED";
+        }
+        await db.query(
+          `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key) SELECT n.incident_id,n.recipient_id,'SMS','sms:'||n.dedupe_key FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE n.incident_id=$1 AND n.channel='IN_APP' AND u.sms_enabled AND u.phone IS NOT NULL ON CONFLICT DO NOTHING`,
+          [i.id],
+        );
+      }
+      await db.query(
+        "UPDATE escalation_executions SET completed_at=now(),outcome=$2 WHERE id=$1",
+        [e.id, outcome],
+      );
+      await audit(db, null, "ESCALATION", "incident", i.id, {
+        stage: e.stage,
+        outcome,
+      });
+    });
+}
+export async function sendNotifications() {
+  if (config.SMS_ENABLED !== "true") return;
+  for (let n = 0; n < 20; n++) {
+    const job = await transaction(async (db) => {
+      const j = (
+        await db.query(
+          `SELECT n.id,n.incident_id,u.phone FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE n.channel='SMS' AND n.status='PENDING' AND u.status='ACTIVE' AND u.sms_enabled AND (SELECT count(*) FROM notification_attempts a WHERE a.job_id=n.id AND a.outcome='SENDING')<3 AND (SELECT count(*) FROM notification_jobs recent WHERE recent.recipient_id=n.recipient_id AND recent.channel='SMS' AND recent.status IN('SUBMITTED','UNKNOWN') AND recent.created_at>now()-interval '1 hour')<6 ORDER BY n.created_at FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
+        )
+      ).rows[0];
+      if (j) {
+        await db.query(
+          "UPDATE notification_jobs SET status='UNKNOWN' WHERE id=$1",
+          [j.id],
+        );
+        await db.query(
+          "INSERT INTO notification_attempts(job_id,outcome) VALUES($1,'SENDING')",
+          [j.id],
+        );
+      }
+      return j;
+    });
+    if (!job) break;
+    try {
+      const result = await sns.send(
+        new PublishCommand({
+          PhoneNumber: job.phone,
+          Message: `Response coordination: incident ${job.incident_id}. Sign in to review. Notification is not dispatch confirmation.`,
+          MessageAttributes: {
+            "AWS.SNS.SMS.SMSType": {
+              DataType: "String",
+              StringValue: "Transactional",
+            },
+          },
+        }),
+      );
+      await transaction(async (db) => {
+        await db.query(
+          "UPDATE notification_jobs SET status='SUBMITTED' WHERE id=$1",
+          [job.id],
+        );
+        await db.query(
+          "INSERT INTO notification_attempts(job_id,provider_id,outcome) VALUES($1,$2,'SUBMITTED')",
+          [job.id, result.MessageId],
+        );
+      });
+    } catch (e) {
+      const error = e as {
+        $metadata?: { httpStatusCode?: number };
+        name?: string;
+      };
+      const definite =
+        !!error.$metadata?.httpStatusCode &&
+        error.$metadata.httpStatusCode < 500;
+      await transaction(async (db) => {
+        await db.query("UPDATE notification_jobs SET status=$2 WHERE id=$1", [
+          job.id,
+          definite ? "FAILED" : "UNKNOWN",
+        ]);
+        await db.query(
+          "INSERT INTO notification_attempts(job_id,outcome,error_code) VALUES($1,$2,$3)",
+          [
+            job.id,
+            definite ? "FAILED" : "UNKNOWN",
+            error.name ?? "PROVIDER_ERROR",
+          ],
+        );
+      });
+      console.error(
+        JSON.stringify({ event: "notification_failed", jobId: job.id }),
+      );
+    }
+  }
+}
+export async function maintenance() {
+  await transaction(async (db) => {
+    await db.query(
+      "DELETE FROM team_location_updates WHERE received_at<now()-$1*interval '1 hour'",
+      [config.LOCATION_RETENTION_HOURS],
+    );
+    await db.query(
+      "UPDATE rescue_teams SET location=NULL,location_at=NULL,accuracy=NULL WHERE location_at<now()-$1*interval '1 hour'",
+      [config.LOCATION_RETENTION_HOURS],
+    );
+    await db.query(
+      "UPDATE location_sessions SET active=false,stopped_at=now() WHERE active AND expires_at<=now()",
+    );
+    await db.query("DELETE FROM sessions WHERE expires_at<=now()");
+    await db.query("DELETE FROM oauth_states WHERE expires_at<=now()");
+  });
+}
+export async function exportAnalytics() {
+  if (!config.ANALYTICS_BUCKET) return;
+  await transaction(async (db) => {
+    if (
+      !(
+        await db.query(
+          "SELECT pg_try_advisory_xact_lock(hashtext('analytics')) locked",
+        )
+      ).rows[0].locked
+    )
+      return;
+    const day = (await db.query("SELECT (current_date-1)::text day")).rows[0]
+      .day;
+    if (
+      (await db.query("SELECT 1 FROM analytics_exports WHERE day=$1", [day]))
+        .rowCount
+    )
+      return;
+    const data = (
+      await db.query(
+        `SELECT category,severity,status,count(*)::int incident_count,avg(extract(epoch FROM (updated_at-created_at)))::float8 age_seconds FROM incidents WHERE created_at >= $1::date AND created_at < $1::date+interval '1 day' GROUP BY category,severity,status`,
+        [day],
+      )
+    ).rows;
+    const key = `daily/day=${day}/incidents.json`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: config.ANALYTICS_BUCKET,
+        Key: key,
+        Body: data.map((d) => JSON.stringify({ ...d, day })).join("\n"),
+        ContentType: "application/x-ndjson",
+        ServerSideEncryption: "AES256",
+      }),
+    );
+    await db.query(
+      "INSERT INTO analytics_exports(day,object_key) VALUES($1,$2)",
+      [day, key],
+    );
+  });
+}
+export async function tick() {
+  await pool.query(
+    "INSERT INTO runtime_heartbeats(name,last_seen) VALUES('worker',now()) ON CONFLICT(name) DO UPDATE SET last_seen=now()",
+  );
+  await flushOutbox();
+  await runEscalations();
+  await sendNotifications();
+  await maintenance();
+  await exportAnalytics();
+}

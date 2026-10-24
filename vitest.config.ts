@@ -1,0 +1,2 @@
+import {defineConfig} from 'vitest/config';
+export default defineConfig({test:{include:['tests/**/*.test.ts'],fileParallelism:false,testTimeout:15000,hookTimeout:60000,env:{NODE_ENV:'test',AUTH_MODE:'demo',DATABASE_URL:process.env.TEST_DATABASE_URL??'postgresql://response:local-development-only@127.0.0.1:5432/response_test',APP_ORIGIN:'http://localhost:5173',API_ORIGIN:'http://localhost:4000'}}});

@@ -1,0 +1,3342 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Response coordination API",
+    "version": "0.1.0",
+    "description": "Cookie sessions and CSRF-protected mutations. See API.md for complete authorization and state rules. No AWS deployment is implied."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness",
+        "operationId": "get_health",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Database readiness",
+        "operationId": "get_health_ready",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/auth/config": {
+      "get": {
+        "summary": "Public identity configuration",
+        "operationId": "get_auth_config",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/auth/login": {
+      "get": {
+        "summary": "Cognito PKCE sign in",
+        "operationId": "get_auth_login",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          },
+          "302": {
+            "description": "Identity/application redirect"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "summary": "Cognito callback on frontend proxy origin",
+        "operationId": "get_auth_callback",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          },
+          "302": {
+            "description": "Identity/application redirect"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "Session profile and CSRF",
+        "operationId": "get_auth_me",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/auth/demo": {
+      "post": {
+        "summary": "Local development identity only",
+        "operationId": "post_auth_demo",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Revoke session and stop tracking",
+        "operationId": "post_auth_logout",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me": {
+      "patch": {
+        "summary": "Update own display name",
+        "operationId": "patch_users_me",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog": {
+      "get": {
+        "summary": "Category and organizational catalog",
+        "operationId": "get_catalog",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/incidents": {
+      "get": {
+        "summary": "GET /incidents",
+        "operationId": "get_incidents",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "POST /incidents",
+        "operationId": "post_incidents",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          },
+          "201": {
+            "description": "Created or idempotently returned existing result"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/emergency-requests": {
+      "get": {
+        "summary": "GET /emergency-requests",
+        "operationId": "get_emergency_requests",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "POST /emergency-requests",
+        "operationId": "post_emergency_requests",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          },
+          "201": {
+            "description": "Created or idempotently returned existing result"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/incidents/{id}": {
+      "get": {
+        "summary": "GET /incidents/{id}",
+        "operationId": "get_incidents__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/incidents/{id}/status": {
+      "post": {
+        "summary": "POST /incidents/{id}/status",
+        "operationId": "post_incidents__id__status",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/incidents/{id}/eligible-teams": {
+      "get": {
+        "summary": "GET /incidents/{id}/eligible-teams",
+        "operationId": "get_incidents__id__eligible_teams",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/incidents/{id}/duplicates": {
+      "get": {
+        "summary": "GET /incidents/{id}/duplicates",
+        "operationId": "get_incidents__id__duplicates",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/incidents/{id}/escalations": {
+      "get": {
+        "summary": "GET /incidents/{id}/escalations",
+        "operationId": "get_incidents__id__escalations",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/incidents/{id}/escalate": {
+      "post": {
+        "summary": "POST /incidents/{id}/escalate",
+        "operationId": "post_incidents__id__escalate",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/incidents/{id}/publish": {
+      "post": {
+        "summary": "POST /incidents/{id}/publish",
+        "operationId": "post_incidents__id__publish",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/incidents/{id}/events": {
+      "get": {
+        "summary": "GET /incidents/{id}/events",
+        "operationId": "get_incidents__id__events",
+        "responses": {
+          "200": {
+            "description": "Authorized refresh events; revoked on access loss",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/assignments": {
+      "post": {
+        "summary": "POST /assignments",
+        "operationId": "post_assignments",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          },
+          "201": {
+            "description": "Created or idempotently returned existing result"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assignments/{id}/status": {
+      "post": {
+        "summary": "POST /assignments/{id}/status",
+        "operationId": "post_assignments__id__status",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/locations/sessions": {
+      "post": {
+        "summary": "POST /locations/sessions",
+        "operationId": "post_locations_sessions",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/locations/sessions/{id}": {
+      "delete": {
+        "summary": "DELETE /locations/sessions/{id}",
+        "operationId": "delete_locations_sessions__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ]
+      }
+    },
+    "/locations/updates": {
+      "post": {
+        "summary": "POST /locations/updates",
+        "operationId": "post_locations_updates",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/locations/incidents/{id}": {
+      "get": {
+        "summary": "GET /locations/incidents/{id}",
+        "operationId": "get_locations_incidents__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/locations/map/style": {
+      "get": {
+        "summary": "GET /locations/map/style",
+        "operationId": "get_locations_map_style",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/evidence/upload": {
+      "post": {
+        "summary": "POST /evidence/upload",
+        "operationId": "post_evidence_upload",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evidence/{id}/complete": {
+      "post": {
+        "summary": "POST /evidence/{id}/complete",
+        "operationId": "post_evidence__id__complete",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evidence/{id}": {
+      "get": {
+        "summary": "GET /evidence/{id}",
+        "operationId": "get_evidence__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/teams": {
+      "get": {
+        "summary": "GET /teams",
+        "operationId": "get_teams",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/teams/{id}/duty": {
+      "post": {
+        "summary": "POST /teams/{id}/duty",
+        "operationId": "post_teams__id__duty",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{id}/assistance": {
+      "post": {
+        "summary": "POST /teams/{id}/assistance",
+        "operationId": "post_teams__id__assistance",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resources": {
+      "get": {
+        "summary": "GET /resources",
+        "operationId": "get_resources",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/resources/{id}/allocate": {
+      "post": {
+        "summary": "POST /resources/{id}/allocate",
+        "operationId": "post_resources__id__allocate",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resources/allocations/{id}/release": {
+      "post": {
+        "summary": "POST /resources/allocations/{id}/release",
+        "operationId": "post_resources_allocations__id__release",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/announcements": {
+      "get": {
+        "summary": "GET /announcements",
+        "operationId": "get_announcements",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "POST /announcements",
+        "operationId": "post_announcements",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/announcements/{id}": {
+      "patch": {
+        "summary": "PATCH /announcements/{id}",
+        "operationId": "patch_announcements__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/situation": {
+      "get": {
+        "summary": "GET /situation",
+        "operationId": "get_situation",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/notifications": {
+      "get": {
+        "summary": "GET /notifications",
+        "operationId": "get_notifications",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/notifications/{id}/read": {
+      "post": {
+        "summary": "POST /notifications/{id}/read",
+        "operationId": "post_notifications__id__read",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "GET /metrics",
+        "operationId": "get_metrics",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "summary": "GET /admin/users",
+        "operationId": "get_admin_users",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "POST /admin/users",
+        "operationId": "post_admin_users",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{id}/status": {
+      "post": {
+        "summary": "POST /admin/users/{id}/status",
+        "operationId": "post_admin_users__id__status",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/teams": {
+      "post": {
+        "summary": "POST /admin/teams",
+        "operationId": "post_admin_teams",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/departments": {
+      "post": {
+        "summary": "POST /admin/departments",
+        "operationId": "post_admin_departments",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/jurisdictions": {
+      "post": {
+        "summary": "POST /admin/jurisdictions",
+        "operationId": "post_admin_jurisdictions",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/categories/{code}": {
+      "put": {
+        "summary": "PUT /admin/categories/{code}",
+        "operationId": "put_admin_categories__code_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/policies": {
+      "get": {
+        "summary": "GET /admin/policies",
+        "operationId": "get_admin_policies",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/policies/{id}": {
+      "put": {
+        "summary": "PUT /admin/policies/{id}",
+        "operationId": "put_admin_policies__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/resources": {
+      "post": {
+        "summary": "POST /admin/resources",
+        "operationId": "post_admin_resources",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/resources/{id}": {
+      "patch": {
+        "summary": "PATCH /admin/resources/{id}",
+        "operationId": "patch_admin_resources__id_",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/notifications/{id}/retry": {
+      "post": {
+        "summary": "POST /admin/notifications/{id}/retry",
+        "operationId": "post_admin_notifications__id__retry",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/audit": {
+      "get": {
+        "summary": "GET /admin/audit",
+        "operationId": "get_admin_audit",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/health": {
+      "get": {
+        "summary": "GET /admin/health",
+        "operationId": "get_admin_health",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/notification-config": {
+      "get": {
+        "summary": "Notification configuration status without phone disclosure",
+        "operationId": "get_admin_notification-config",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/users/{id}/organization": {
+      "patch": {
+        "summary": "Change organizational scope and revoke sessions",
+        "operationId": "patch_admin_users_id_organization",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Validated fields described in docs/API.md"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/incidents/{id}/resource-allocations": {
+      "get": {
+        "summary": "Scoped resource allocation history",
+        "operationId": "get_incidents_id_resource-allocations",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "response_session"
+      }
+    },
+    "schemas": {
+      "IncidentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "category",
+          "severity",
+          "latitude",
+          "longitude"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "EMERGENCY",
+              "REPORT"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "LOW",
+              "MODERATE",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    }
+  }
+}

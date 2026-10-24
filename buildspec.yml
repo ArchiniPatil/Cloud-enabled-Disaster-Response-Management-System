@@ -1,0 +1,25 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - npm ci
+  pre_build:
+    commands:
+      - docker compose up -d --wait db
+      - docker compose exec -T db createdb -U response response_test
+      - npm run lint
+      - npm test
+      - npm run build
+      - bash scripts/fetch-rds-ca.sh
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${REPOSITORY_URI%/*}"
+  build:
+    commands:
+      - IMAGE_TAG="$CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - docker build -t "$REPOSITORY_URI:$IMAGE_TAG" .
+      - docker push "$REPOSITORY_URI:$IMAGE_TAG"
+      - node -e 'require("fs").writeFileSync("imagedefinitions.json",JSON.stringify([{name:"api",imageUri:process.env.REPOSITORY_URI+":"+process.env.CODEBUILD_RESOLVED_SOURCE_VERSION}]))'
+artifacts:
+  files:
+    - imagedefinitions.json

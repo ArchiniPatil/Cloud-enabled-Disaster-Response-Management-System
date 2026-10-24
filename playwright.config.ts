@@ -1,0 +1,3 @@
+import {defineConfig} from '@playwright/test';
+import {existsSync} from 'node:fs';
+export default defineConfig({testDir:'tests/browser',workers:1,fullyParallel:false,timeout:60000,use:{baseURL:'http://localhost:5173',headless:true,launchOptions:existsSync('/usr/bin/chromium')?{executablePath:'/usr/bin/chromium',args:['--no-sandbox']}:undefined,screenshot:'only-on-failure',trace:'retain-on-failure'},webServer:{command:'AUTH_MODE=demo npm run db:migrate && AUTH_MODE=demo npm run db:seed && AUTH_MODE=demo npm run dev',url:'http://localhost:5173',reuseExistingServer:!process.env.CI,timeout:60000}});

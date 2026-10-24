@@ -1,0 +1,3 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+export default tseslint.config({ignores:['node_modules/**','dist/**','apps/web/dist/**','cdk.out/**','test-results/**','playwright-report/**']},js.configs.recommended,...tseslint.configs.recommended,{languageOptions:{globals:{console:'readonly',process:'readonly',Buffer:'readonly',crypto:'readonly',setTimeout:'readonly',setInterval:'readonly',clearInterval:'readonly',URL:'readonly',URLSearchParams:'readonly',fetch:'readonly',AbortSignal:'readonly',TextDecoder:'readonly'}},rules:{'@typescript-eslint/no-explicit-any':'off','@typescript-eslint/no-unused-vars':['error',{argsIgnorePattern:'^_',varsIgnorePattern:'^_'}],'@typescript-eslint/no-namespace':'off'}});

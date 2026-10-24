@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+.env.*
+cdk.out
+.local
+dist
+apps/web/dist
+test-results
+playwright-report
