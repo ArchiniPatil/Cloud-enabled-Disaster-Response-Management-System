@@ -2,7 +2,7 @@
 
 Updated 25 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
 
-**Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; the user has now instructed deployment within the reviewed 24-hour/$30-credit scope. Approval is recorded; actual AWS identity, account checks and the administrator/budget email remain prerequisites. The cash-funded reference stays blocked.
+**Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; the user has now instructed deployment within the reviewed 24-hour/$30-credit scope. Approval and administrator/budget email are recorded. Live STS and the Free Tier API now confirm access and an ACTIVE FREE plan with $120 credits, expiring 10 April 2027. An AWS Organizations SCP explicitly denies CloudFormation inventory, blocking deployment. The cash-funded reference stays blocked.
 
 ## Completed implementation
 
@@ -36,8 +36,10 @@ Updated 25 October 2026. The repository was initially empty. **The core applicat
 | Pipeline + analytics variant synthesis | Passed | Optional resources included, not provisioned |
 | Frozen installation and repeatable migrations/seed | Passed | Existing local checkout and persistent database |
 | Production dependency audit | 0 known vulnerabilities reported | npm audit result at validation time; not a security certification |
-| AWS STS identity | Blocked | Environment's configured profile unavailable |
-| Live AWS integration tests | Not run | Require account access/configuration and provisioning approval |
+| AWS STS identity | Passed, 25 October 2026 | Supplied runtime credentials authenticate `project-admin` after omitting the nonexistent workspace profile |
+| AWS Free Tier account plan | Passed, 25 October 2026 | ACTIVE FREE; $120 credits; expiration 10 April 2027 |
+| CloudFormation inventory | Blocked | Explicit deny of `cloudformation:ListStacks` by Organizations SCP `p-7hvdp5n3` |
+| Live application integrations | Not run | Provisioning blocked by the organization policy |
 
 See `TESTING.md` for commands and precise test boundaries. Test outcomes above describe executed checks, not a claim of emergency-service suitability.
 
@@ -70,8 +72,8 @@ See `TESTING.md` for commands and precise test boundaries. Test outcomes above d
 
 ## Reusable development environment
 
-The environment draft contains tested `install_script` and `start_skill` instructions, preserving the existing checkout, $0 AWS policy and no-domain evaluation path. Saving this draft is confirmed; environment publication and validation in a fresh restored task have not been performed. Current API/frontend/worker startup and the database heartbeat were verified.
+The environment draft contains tested `install_script` and `start_skill` instructions, preserving the existing checkout, $0 AWS policy and no-domain evaluation path. Saving this draft is confirmed; publication is confirmed and runtime AWS variables are available; validation in a fresh restored task has not been performed. Current API/frontend/worker startup and the database heartbeat were verified.
 
 ## Real-account default (25 October 2026)
 
-Normal `setup:local` / `dev:local` now require actual Cognito configuration and an unseeded real-account database. Fixture accounts are only available through explicit `setup:demo` / `dev:demo` commands using `.env.demo`; existing legacy `.env` files are not silently reused. `.env.example` is Cognito-based. AWS deployment approval is recorded for the previously reviewed scope. No live authentication or deployment success is claimed: this workspace still lacks usable AWS credentials and the budget email.
+Normal `setup:local` / `dev:local` now require actual Cognito configuration and an unseeded real-account database. Fixture accounts are only available through explicit `setup:demo` / `dev:demo` commands using `.env.demo`; existing legacy `.env` files are not silently reused. `.env.example` is Cognito-based. AWS deployment approval is recorded for the previously reviewed scope. AWS operator authentication and Free Tier account checks now pass; application authentication remains untested. CloudFormation inventory is blocked by organization policy, so no deployment has occurred.

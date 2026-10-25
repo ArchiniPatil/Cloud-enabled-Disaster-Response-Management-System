@@ -69,3 +69,12 @@ Release verification on 25 October 2026: the updated Node 22 container built suc
 The identity-only template, default-hostname academic template and custom-domain reference all synthesized successfully. The optional pipeline/analytics/SMS-receipt-subscription variant also synthesized, using a clearly synthetic account ID solely for the template test. The academic template includes three Glue tables; local security assertions passed for private database/tasks, internal ALB/VPC Link, MFA, redrive, scheduler, migrations, budget and secret-free outputs. These remain undeployed definitions.
 
 Default-authentication checks now verify that normal startup cannot enter fixture mode. The deployment-guard test uses an explicitly unapproved temporary configuration, so the real deployment authorization never causes tests to invoke AWS. Local fixture setup/startup commands are now `setup:demo` / `dev:demo`; normal startup uses Cognito.
+
+
+## Live account preflight — 25 October 2026
+
+- Published runtime AWS credentials authenticated `project-admin` through STS. The initial call failed because the workspace still selected a nonexistent profile; omitting `AWS_PROFILE` and `AWS_DEFAULT_PROFILE` for that command allowed the explicitly supplied credentials to work.
+- `aws freetier get-account-plan-state --region us-east-1` confirmed ACTIVE FREE, $120 credits, and expiry on 10 April 2027.
+- `aws cloudformation list-stacks --region ap-south-1` failed with an explicit deny of `cloudformation:ListStacks` by Organizations SCP `p-7hvdp5n3`. Deployment did not proceed. IAM grants alone cannot override this restriction.
+- The installed CLI rejects `--no-cli-pager`; read-only checks were rerun without that option. Cloud deployment requires a compatible AWS CLI before using the existing helper.
+- No resources were provisioned, no account plan was changed, and no application/provider acceptance tests were claimed. No credentials were printed or committed.

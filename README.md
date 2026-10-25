@@ -79,7 +79,7 @@ bash scripts/deploy.sh preview
 bash scripts/deploy.sh deploy
 ```
 
-The deploy script requires approved HTTPS domain configuration, an existing ACM certificate, a budget email, and an explicit approval variable. Preview does not deploy. CDK bootstrap, DNS changes, account registrations, and SMS enabling also require appropriate authorization. The environment currently lacks usable AWS identity.
+The deploy script requires approved HTTPS domain configuration, an existing ACM certificate, a budget email, and an explicit approval variable. Preview does not deploy. CDK bootstrap, DNS changes, account registrations, and SMS enabling also require appropriate authorization. AWS identity is now verified; deployment is blocked by an explicit AWS Organizations policy deny on CloudFormation. See `docs/ACADEMIC_DEMO.md` for the current status.
 
 ## Layout
 

@@ -2,9 +2,11 @@
 
 ## Current status and account constraint
 
-The user reports an AWS **Free plan, $120 remaining credits, and 169 days remaining**. This is user-provided billing information, not an API-verified balance. The cash budget remains **$0**. On 25 October 2026 the user instructed AWS setup after reviewing the 24-hour, $30-credit plan. This scope is now recorded as approved; AWS access and the alert/admin email remain missing. No account-plan upgrade, SMS sending or provisioning has been performed. Never treat service availability as proof that every feature or all usage is free.
+On 25 October 2026, live AWS STS authenticated the configured `project-admin` user. The Free Tier API confirmed an **ACTIVE FREE plan, $120 remaining credits, and expiration on 10 April 2027**. The cash budget remains **$0**. Deployment is authorized within the recorded 24-hour/$30-credit scope; the administrator/budget email is configured. No account upgrade, SMS sending or provisioning has been performed.
 
-The cloud workspace still cannot authenticate to AWS. Credentials on the user's Windows laptop are not available to this workspace. Run read-only checks from the laptop with its configured AWS CLI; never share access keys, passwords, tokens or MFA codes.
+**Current blocker:** `cloudformation:ListStacks` in `ap-south-1` returned an explicit deny from AWS Organizations service control policy `p-7hvdp5n3`. An organization administrator must review that restriction before CloudFormation deployment can proceed. IAM permission grants cannot override an SCP deny. If this restriction is AWS-managed for the Free plan, confirm supported options with AWS Support; do not upgrade the plan automatically or bypass the restriction with direct service provisioning.
+
+Published credentials are available as direct runtime variables. The workspace's pre-existing nonexistent profile prevented the initial STS check; a per-command environment without `AWS_PROFILE` / `AWS_DEFAULT_PROFILE` successfully used the supplied credentials. No credential values were printed or saved in source. No cloud resources or hosted application URL have been created. After the organization restriction is resolved, rerun the read-only checks:
 
 ```powershell
 npm run aws:preflight
