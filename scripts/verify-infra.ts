@@ -43,15 +43,30 @@ assert(
       "DISABLED",
   ),
 );
-assert(
-  of("AWS::ElasticLoadBalancingV2::Listener").some(
-    (l) => l.Properties.Protocol === "HTTPS",
-  ),
-);
+if (of("AWS::ApiGatewayV2::Api").length) {
+  assert(
+    of("AWS::ElasticLoadBalancingV2::LoadBalancer").every(
+      (l) => l.Properties.Scheme === "internal",
+    ),
+  );
+  assert(
+    of("AWS::ApiGatewayV2::Integration").every(
+      (i) => i.Properties.ConnectionType === "VPC_LINK",
+    ),
+  );
+  assert.equal(of("AWS::ApiGatewayV2::VpcLink").length, 1);
+  assert(!template.Parameters?.ApiCertificateArn);
+  assert(!template.Parameters?.FrontendOrigin);
+} else
+  assert(
+    of("AWS::ElasticLoadBalancingV2::Listener").some(
+      (l) => l.Properties.Protocol === "HTTPS",
+    ),
+  );
 assert(resources.some((r) => r.Type === "AWS::CloudFormation::CustomResource"));
 assert(of("AWS::Budgets::Budget").length === 1);
 for (const o of Object.values(template.Outputs ?? {}) as any[])
   assert(!/SecretString|password|access.key/i.test(JSON.stringify(o.Value)));
 console.log(
-  "Infrastructure assertions passed: private encrypted DB, retained data, MFA, queue redrive, durable schedule, private tasks, HTTPS, migrations, budget and no secret-value outputs.",
+  "Infrastructure assertions passed: private encrypted DB, retained data, MFA, queue redrive, durable schedule, private tasks, HTTPS ingress or private API Gateway integration, migrations, budget and no secret-value outputs.",
 );

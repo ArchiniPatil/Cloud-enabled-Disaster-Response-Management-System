@@ -1,0 +1,12 @@
+{
+  "accountPlanReportedByUser": "Free plan",
+  "remainingCreditsReportedUsd": 120,
+  "remainingDaysReported": 169,
+  "cashBudgetUsd": 0,
+  "provisioningApproved": false,
+  "creditAllowanceUsd": 0,
+  "maximumDemoHours": 24,
+  "region": "ap-south-1",
+  "upgradeAccountPlan": false,
+  "smsEnabled": false
+}

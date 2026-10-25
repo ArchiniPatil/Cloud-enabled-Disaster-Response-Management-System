@@ -6,6 +6,7 @@ import { eligibleTeams } from "./policy.js";
 import { notifyControl } from "./incidents.js";
 import { escalationNeeded } from "../../../packages/core/src/domain.js";
 import { s3 } from "./evidence.js";
+import { reconcileReceipt } from "./sms-receipts.js";
 const sns = new SNSClient({ region: config.AWS_REGION });
 export async function consumeEvent(event: {
   id: string;
@@ -61,7 +62,11 @@ export async function flushOutbox() {
               }),
             }),
           );
-        else if (config.AUTH_MODE === "demo") await consumeEvent(e);
+        else if (
+          config.AUTH_MODE === "demo" ||
+          config.EVENT_TRANSPORT === "database"
+        )
+          await consumeEvent(e);
         else throw new Error("Event topic missing");
         await db.query(
           "UPDATE outbox_events SET published_at=now(),attempts=attempts+1 WHERE id=$1",
@@ -228,6 +233,7 @@ export async function sendNotifications() {
           "INSERT INTO notification_attempts(job_id,provider_id,outcome) VALUES($1,$2,'SUBMITTED')",
           [job.id, result.MessageId],
         );
+        if (result.MessageId) await reconcileReceipt(db, result.MessageId);
       });
     } catch (e) {
       const error = e as {
@@ -285,7 +291,7 @@ export async function exportAnalytics() {
       ).rows[0].locked
     )
       return;
-    const day = (await db.query("SELECT (current_date-1)::text day")).rows[0]
+    const day = (await db.query("SELECT (current_date-1)::text AS day")).rows[0]
       .day;
     if (
       (await db.query("SELECT 1 FROM analytics_exports WHERE day=$1", [day]))
@@ -294,7 +300,13 @@ export async function exportAnalytics() {
       return;
     const data = (
       await db.query(
-        `SELECT category,severity,status,count(*)::int incident_count,avg(extract(epoch FROM (updated_at-created_at)))::float8 age_seconds FROM incidents WHERE created_at >= $1::date AND created_at < $1::date+interval '1 day' GROUP BY category,severity,status`,
+        `SELECT i.category,i.severity,i.status,count(*)::int incident_count,avg(extract(epoch FROM (i.updated_at-i.created_at)))::float8 age_seconds,
+        avg(extract(epoch FROM (h.ack-i.response_cycle_started_at)))::float8 acknowledgement_seconds,
+        avg(extract(epoch FROM (h.arrived-i.response_cycle_started_at)))::float8 arrival_seconds,
+        avg(extract(epoch FROM (h.resolved-i.response_cycle_started_at)))::float8 resolution_seconds,
+        count(*) FILTER(WHERE EXISTS(SELECT 1 FROM escalation_executions e WHERE e.incident_id=i.id AND e.stage>0 AND e.completed_at IS NOT NULL AND e.outcome<>'SATISFIED'))::int escalated_count
+        FROM incidents i LEFT JOIN LATERAL(SELECT min(created_at) FILTER(WHERE to_status='ACKNOWLEDGED') ack,min(created_at) FILTER(WHERE to_status='TEAM_ON_SCENE') arrived,min(created_at) FILTER(WHERE to_status='RESOLVED') resolved FROM incident_status_history WHERE incident_id=i.id AND created_at>=i.response_cycle_started_at) h ON true
+        WHERE i.created_at >= $1::date AND i.created_at < $1::date+interval '1 day' GROUP BY i.category,i.severity,i.status`,
         [day],
       )
     ).rows;
@@ -308,6 +320,41 @@ export async function exportAnalytics() {
         ServerSideEncryption: "AES256",
       }),
     );
+    const teams = (
+      await db.query(
+        `SELECT t.department_id,t.availability,count(*)::int team_count,sum(t.capacity)::int capacity,
+      sum((SELECT count(*) FROM incident_assignments a WHERE a.team_id=t.id AND a.status NOT IN('COMPLETED','DECLINED','CANCELLED')))::int active_assignments,
+      sum((SELECT count(*) FROM incident_assignments a WHERE a.team_id=t.id AND a.status='COMPLETED' AND a.updated_at >= $1::date AND a.updated_at < $1::date+interval '1 day'))::int completed_assignments
+      FROM rescue_teams t GROUP BY t.department_id,t.availability`,
+        [day],
+      )
+    ).rows;
+    const resources = (
+      await db.query(`SELECT r.department_id,r.type,r.status,sum(r.quantity)::int quantity,
+      sum(coalesce((SELECT sum(a.quantity) FROM resource_allocations a WHERE a.resource_id=r.id AND a.released_at IS NULL),0))::int allocated
+      FROM resources r GROUP BY r.department_id,r.type,r.status`)
+    ).rows;
+    for (const [dataset, rows] of [
+      ["teams", teams],
+      ["resources", resources],
+    ] as const)
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: config.ANALYTICS_BUCKET,
+          Key: `${dataset}/day=${day}/snapshot.json`,
+          Body: rows
+            .map((d) =>
+              JSON.stringify({
+                ...d,
+                day,
+                snapshot_at: new Date().toISOString(),
+              }),
+            )
+            .join("\n"),
+          ContentType: "application/x-ndjson",
+          ServerSideEncryption: "AES256",
+        }),
+      );
     await db.query(
       "INSERT INTO analytics_exports(day,object_key) VALUES($1,$2)",
       [day, key],

@@ -6,8 +6,8 @@ Validation performed locally on 24 October 2026, using Node 24 on the host, Node
 |---|---|
 | `npm run lint` | Passed |
 | `npm run typecheck` / `npm run build` | Passed; MapLibre's lazy-loaded map bundle has a size warning |
-| `npm test` | **31 passed**, 2 files; no skipped tests |
-| `npm run test:e2e` | **3 passed**; no skipped scenarios |
+| `npm test` | **40 passed**, 2 files; no skipped tests |
+| `npm run test:e2e` | **4 passed** with SSE and polling; no skipped scenarios |
 | `npm run infra:check` | Synthesis plus private-network/encryption/MFA/queue/scheduler/budget/secret-output assertions passed |
 | `npm run infra:synth -- -c analytics=true -c pipeline=true --quiet` | Passed; optional resources defined only |
 | `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities reported |
@@ -55,3 +55,15 @@ For this correction, setup, lint, typechecking, development startup, the databas
 ## Remaining acceptance gates
 
 After approved AWS provisioning, run a real-identity and real-provider version of the workflow: Cognito enrollment/session renewal/revocation, least-privilege S3 and DB access, provider route results, bounded queue retries and DLQ recovery, validated SMS sandbox receipt handling, deployed SSE/cookies, alarm notification and RDS restore. Validate rate limits/load, timezone and jurisdiction edge cases, accessibility, malicious evidence handling, and operational policies before any real emergency use.
+
+## Academic expansion checks
+
+The new tests exercise PKCE login/registration/recovery redirects without contacting Cognito, organization deactivation and qualification expiry, scoped metrics, announcement revision/withdrawal, duplicate/out-of-order SMS receipts, encrypted three-dataset analytics exports using an S3 stub, private/public resource locations, bounded address search using a Location stub, and the unapproved academic-deployment guard. No test result represents live Cognito, SNS, S3 or Location acceptance.
+
+The test database now runs the actual ordered migration runner, including management/receipt and resource-location migrations. An added analytics test exposed a reserved SQL alias in the previous export path; it was corrected and the test rerun. The initial integration run encountered a stopped local database; Docker was started before rerunning successfully.
+
+Native Windows remains unverified here. Bash is still required for the older paid-deployment script test; local app/Cognito startup and the new academic helpers run through Node. The academic template's internal ALB/HTTPS gateway, database privacy, MFA and no-secret-output checks are local template assertions, not a deployed networking test.
+
+Release verification on 25 October 2026: the updated Node 22 container built successfully and passed database readiness, cookie sign-in, scoped incident listing and logout. The first smoke request arrived before container startup completed; it passed after the startup event. The managed build used a writable ignored Docker configuration directory because the default home directory was read-only. No application TLS checks were disabled.
+
+The identity-only template, default-hostname academic template and custom-domain reference all synthesized successfully. The optional pipeline/analytics/SMS-receipt-subscription variant also synthesized, using a clearly synthetic account ID solely for the template test. The academic template includes three Glue tables; local security assertions passed for private database/tasks, internal ALB/VPC Link, MFA, redrive, scheduler, migrations, budget and secret-free outputs. These remain undeployed definitions.

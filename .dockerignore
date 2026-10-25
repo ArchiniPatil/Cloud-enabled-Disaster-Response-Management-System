@@ -8,3 +8,5 @@ dist
 apps/web/dist
 test-results
 playwright-report
+
+.aws/

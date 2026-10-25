@@ -7,8 +7,8 @@ Responses are JSON except OAuth redirects, SSE and map assets. Errors: `{ "error
 ## Authentication and health
 
 - `GET /health` liveness; `GET /health/ready` checks DB/schema without secrets.
-- `GET /auth/config`: mode and optional configured emergency-call number.
-- `GET /auth/login`: Cognito code/PKCE redirect; registration through the managed identity page.
+- `GET /auth/config`: mode, identity readiness, SSE/poll transport and optional configured emergency-call number.
+- `GET /auth/login`, `/auth/register`, `/auth/recover`: state/PKCE-protected Cognito managed sign-in, citizen registration and password recovery.
 - `GET /auth/callback`: code exchange, verified identity, citizen-only profile creation, session cookie.
 - `GET /auth/me`: session profile and CSRF token.
 - `POST /auth/logout`: local revocation, location stop, provider revocation attempt, optional Cognito logout URL.
@@ -78,3 +78,17 @@ Incident states: SUBMITTED → ACKNOWLEDGED → DISPATCHED → TEAM_EN_ROUTE →
 - `GET /admin/audit`; `GET /admin/health`.
 
 External integration failures never return fabricated success. Live AWS acceptance tests and API-only management actions are detailed in implementation status.
+
+## Academic expansion endpoints
+
+- `GET /metrics/operations?days=30`: authority/admin only, 1–90 day bounded incident outcomes/milestone times, category counts and current team/inventory utilization. Department/jurisdiction filtering is enforced in SQL.
+- `GET /locations/search?q=...`: authenticated, 3–200 characters, at most five Amazon Location results; 503 if unconfigured.
+- `GET /resource-locations`: published sites plus the viewer's authorized private locations. No public endpoint exposes unpublished inventory locations.
+- `GET/POST /admin/organizations`; `PATCH /admin/organizations/{id}` with `{name,active}`. Deactivation rejects active assignments and stops the organization's location sessions.
+- `GET /admin/team-details`: team configuration, members and qualification expiry. `PATCH /admin/teams/{id}` accepts `{name,organizationId,vehicle,capacity,capabilities:[{capability,expiresAt}]}`. Active assignments block configuration changes. Expired qualifications prevent eligibility.
+- `POST /admin/users/{id}/resend-invitation`: only an active operational account with a pending Cognito temporary-password invitation. Accepted identities use password recovery.
+- `PATCH /admin/users/{id}/notification-preferences`: `{phone: E.164-or-null,smsEnabled:boolean}`; global sending remains separately disabled. Phone values are not written to audit details.
+- `GET /admin/notification-jobs`: latest 100 notification statuses and attempt outcomes, without destination phone numbers. Existing bounded retry endpoint accepts only definitive failures.
+- `PATCH /admin/resources/{id}/location`: `{latitude:number|null,longitude:number|null,address,publiclyListed}`. Coordinates must lie inside the resource jurisdiction; publishing without a location is rejected.
+
+SMS delivery ingestion is a restricted CloudWatch-to-Lambda entrypoint, not a public HTTP webhook. The academic deployment uses authenticated five-second polling of existing incident/tracking endpoints; the custom-domain reference retains SSE.

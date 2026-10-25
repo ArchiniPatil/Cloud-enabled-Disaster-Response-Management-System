@@ -3,7 +3,7 @@ import request from "supertest";
 import pg from "pg";
 import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { prepareDatabase } from "../scripts/prepare-database";
-import { readFile } from "node:fs/promises";
+import { migrate } from "../scripts/migrations";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { app } from "../apps/api/src/app";
@@ -14,7 +14,9 @@ import {
   flushOutbox,
   maintenance,
   sendNotifications,
+  exportAnalytics,
 } from "../apps/api/src/jobs";
+import { LocationClient } from "@aws-sdk/client-location";
 import { SNSClient } from "@aws-sdk/client-sns";
 import { config } from "../apps/api/src/config";
 import { s3 } from "../apps/api/src/evidence";
@@ -25,6 +27,9 @@ import {
 } from "@aws-sdk/client-s3";
 import { handler as queueHandler } from "../apps/api/src/lambda";
 import { hash } from "../apps/api/src/auth";
+import { recordReceipt } from "../apps/api/src/sms-receipts";
+import { eligibleTeams } from "../apps/api/src/policy";
+import { transaction } from "../apps/api/src/db";
 const origin = "http://localhost:5173";
 type Client = {
   agent: ReturnType<typeof request.agent>;
@@ -74,20 +79,7 @@ beforeAll(async () => {
   if (!new URL(process.env.DATABASE_URL!).pathname.endsWith("_test"))
     throw new Error("Tests require a dedicated database ending in _test");
   await pool.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
-  await pool.query(await readFile("db/migrations/001_initial.sql", "utf8"));
-  await pool.query(
-    await readFile("db/migrations/002_operational_controls.sql", "utf8"),
-  );
-  await pool.query(
-    await readFile("db/migrations/003_reference_catalog.sql", "utf8"),
-  );
-  await pool.query(
-    await readFile("db/migrations/004_reopened_response_cycles.sql", "utf8"),
-  );
-  await pool.query("CREATE TABLE schema_migrations(name text PRIMARY KEY)");
-  await pool.query(
-    "INSERT INTO schema_migrations VALUES('001_initial.sql'),('002_operational_controls.sql'),('003_reference_catalog.sql'),('004_reopened_response_cycles.sql')",
-  );
+  await migrate();
   execFileSync(process.execPath, ["--import", "tsx", "scripts/seed.ts"], {
     env: process.env,
     stdio: "pipe",
@@ -722,6 +714,342 @@ describe("real PostGIS API workflow and security boundaries", () => {
       .get("/api/v1/admin/notification-config")
       .expect(200);
     expect(configuration.body.smsEnabled).toBe(false);
+  });
+  it("supports Cognito login, registration and recovery with one-time PKCE state (provider not contacted)", async () => {
+    const old = {
+      AUTH_MODE: config.AUTH_MODE,
+      COGNITO_DOMAIN: config.COGNITO_DOMAIN,
+      COGNITO_CLIENT_ID: config.COGNITO_CLIENT_ID,
+      COGNITO_POOL_ID: config.COGNITO_POOL_ID,
+    };
+    try {
+      config.AUTH_MODE = "cognito";
+      config.COGNITO_DOMAIN =
+        "https://example.auth.ap-south-1.amazoncognito.com";
+      config.COGNITO_CLIENT_ID = "testclient";
+      config.COGNITO_POOL_ID = "ap-south-1_test";
+      const info = await request(app).get("/api/v1/auth/config").expect(200);
+      expect(info.body.identityConfigured).toBe(true);
+      for (const [path, destination] of [
+        ["login", "/oauth2/authorize"],
+        ["register", "/signup"],
+        ["recover", "/forgotPassword"],
+      ]) {
+        const r = await request(app).get(`/api/v1/auth/${path}`).expect(302);
+        const url = new URL(r.headers.location);
+        expect(url.pathname).toBe(destination);
+        expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+        expect(url.searchParams.get("redirect_uri")).toBe(
+          `${origin}/api/v1/auth/callback`,
+        );
+        expect(url.searchParams.get("state")?.length).toBeGreaterThan(32);
+        const saved = await pool.query(
+          "SELECT verifier FROM oauth_states WHERE id_hash=$1",
+          [hash(url.searchParams.get("state")!)],
+        );
+        expect(saved.rowCount).toBe(1);
+        expect(r.headers.location).not.toContain(saved.rows[0].verifier);
+      }
+      await request(app)
+        .post("/api/v1/auth/demo")
+        .set("Origin", origin)
+        .send({ email: "admin@demo.invalid" })
+        .expect(404);
+    } finally {
+      Object.assign(config, old);
+    }
+  });
+  it("manages organizations and qualification expiry without allowing non-admin edits", async () => {
+    await post(citizen, "/admin/organizations", {
+      name: "Unauthorized",
+    }).expect(403);
+    const o = (
+      await post(admin, "/admin/organizations", {
+        name: `Test organization ${randomUUID()}`,
+      }).expect(201)
+    ).body;
+    const t = (
+      await post(admin, "/admin/teams", {
+        name: "Qualification test team",
+        organizationId: o.id,
+        departmentId: authority.user.department_id,
+        jurisdictionId: authority.user.jurisdiction_id,
+        capacity: 1,
+        vehicle: "Test",
+        capabilities: ["FIRST_AID"],
+      }).expect(201)
+    ).body;
+    const patch = (path: string, b: any) =>
+      admin.agent
+        .patch(`/api/v1${path}`)
+        .set("Origin", origin)
+        .set("X-CSRF-Token", admin.csrf)
+        .send(b);
+    await patch(`/admin/teams/${t.id}`, {
+      name: "Qualification test team",
+      organizationId: o.id,
+      vehicle: "Test",
+      capacity: 1,
+      capabilities: [
+        { capability: "FIRST_AID", expiresAt: "2020-01-01T00:00:00Z" },
+      ],
+    }).expect(200);
+    await pool.query(
+      "UPDATE rescue_teams SET availability='AVAILABLE',location=ST_SetSRID(ST_MakePoint(72.878,19.077),4326)::geography,location_at=now(),accuracy=10 WHERE id=$1",
+      [t.id],
+    );
+    await pool.query(
+      "INSERT INTO location_sessions(team_id,user_id) VALUES($1,$2)",
+      [t.id, rescuer.user.id],
+    );
+    const id = await report();
+    expect(
+      (await transaction((db) => eligibleTeams(db, id))).map((t) => t.id),
+    ).not.toContain(t.id);
+    await patch(`/admin/organizations/${o.id}`, {
+      name: "Inactive test organization",
+      active: false,
+    }).expect(200);
+    expect(
+      (
+        await pool.query(
+          "SELECT active FROM location_sessions WHERE team_id=$1",
+          [t.id],
+        )
+      ).rows[0].active,
+    ).toBe(false);
+    await post(admin, `/teams/${t.id}/duty`, {
+      availability: "AVAILABLE",
+    }).expect(409);
+    await patch(`/admin/teams/${t.id}`, {
+      name: "Still inactive",
+      organizationId: o.id,
+      vehicle: "",
+      capacity: 1,
+      capabilities: [],
+    }).expect(400);
+    const audit = await pool.query(
+      "SELECT action FROM audit_events WHERE entity_id=$1",
+      [t.id],
+    );
+    expect(audit.rows.map((r) => r.action)).toContain("TEAM_CONFIGURED");
+  });
+  it("reports scoped operational metrics and rejects citizen access", async () => {
+    await citizen.agent.get("/api/v1/metrics/operations").expect(403);
+    const a = await authority.agent
+      .get("/api/v1/metrics/operations?days=30")
+      .expect(200);
+    const b = await admin.agent
+      .get("/api/v1/metrics/operations?days=30")
+      .expect(200);
+    expect(a.body.summary.reported).toBeGreaterThan(0);
+    expect(b.body.summary.reported).toBeGreaterThanOrEqual(
+      a.body.summary.reported,
+    );
+    expect(a.body.summary.arrival_samples).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(a.body)).not.toContain("@demo.invalid");
+    await authority.agent
+      .get("/api/v1/metrics/operations?days=999999")
+      .expect(400);
+  });
+  it("corrects and withdraws announcements with immutable revision history", async () => {
+    const b = {
+      title: "Controlled notice",
+      body: "Testing a corrected notice",
+      audience: "EVERYONE",
+      importance: "INFORMATION",
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    };
+    const a = (await post(authority, "/announcements", b).expect(201)).body;
+    const edit = (c: Client, payload: any) =>
+      c.agent
+        .patch(`/api/v1/announcements/${a.id}`)
+        .set("Origin", origin)
+        .set("X-CSRF-Token", c.csrf)
+        .send(payload);
+    await edit(citizen, b).expect(403);
+    await edit(authority, { ...b, expiresAt: "2020-01-01T00:00:00Z" }).expect(
+      400,
+    );
+    await edit(authority, { ...b, title: "Corrected test notice" }).expect(200);
+    await edit(authority, { ...b, cancelled: true }).expect(200);
+    expect(
+      (
+        await citizen.agent.get("/api/v1/announcements").expect(200)
+      ).body.items.map((x: any) => x.id),
+    ).not.toContain(a.id);
+    expect(
+      Number(
+        (
+          await pool.query(
+            "SELECT count(*) n FROM announcement_revisions WHERE announcement_id=$1",
+            [a.id],
+          )
+        ).rows[0].n,
+      ),
+    ).toBe(3);
+  });
+  it("reconciles duplicate and out-of-order SMS delivery receipts without exposing destination data", async () => {
+    const j = (
+      await pool.query(
+        "INSERT INTO notification_jobs(recipient_id,channel,dedupe_key,status) VALUES($1,'SMS',$2,'SUBMITTED') RETURNING id",
+        [authority.user.id, randomUUID()],
+      )
+    ).rows[0];
+    const provider = randomUUID();
+    await pool.query(
+      "INSERT INTO notification_attempts(job_id,provider_id,outcome) VALUES($1,$2,'SUBMITTED')",
+      [j.id, provider],
+    );
+    expect(
+      await recordReceipt({
+        notification: { messageId: provider },
+        status: "SUCCESS",
+        delivery: { destination: "not persisted" },
+      }),
+    ).toBe(true);
+    await recordReceipt({
+      notification: { messageId: provider },
+      status: "SUCCESS",
+    });
+    await recordReceipt({
+      notification: { messageId: provider },
+      status: "FAILURE",
+    });
+    expect(
+      (
+        await pool.query("SELECT status FROM notification_jobs WHERE id=$1", [
+          j.id,
+        ])
+      ).rows[0].status,
+    ).toBe("DELIVERED");
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int n FROM notification_attempts WHERE job_id=$1 AND outcome='DELIVERED'",
+          [j.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      await recordReceipt({
+        notification: { messageId: provider },
+        status: "READ",
+      }),
+    ).toBe(false);
+    const rows = await pool.query(
+      "SELECT * FROM sms_delivery_receipts WHERE provider_id=$1",
+      [provider],
+    );
+    expect(JSON.stringify(rows.rows)).not.toContain("not persisted");
+  });
+  it("exports three encrypted aggregate analytics datasets once (S3 SDK stub)", async () => {
+    const previous = config.ANALYTICS_BUCKET;
+    config.ANALYTICS_BUCKET = "test-aggregate-bucket";
+    const spy = vi.spyOn(s3, "send").mockResolvedValue({} as never);
+    try {
+      await exportAnalytics();
+      await exportAnalytics();
+      expect(spy).toHaveBeenCalledTimes(3);
+      const inputs = spy.mock.calls.map((c) => (c[0] as any).input);
+      expect(inputs.map((i) => i.Key.split("/")[0]).sort()).toEqual([
+        "daily",
+        "resources",
+        "teams",
+      ]);
+      expect(inputs.every((i) => i.ServerSideEncryption === "AES256")).toBe(
+        true,
+      );
+      expect(inputs.map((i) => i.Body).join("")).not.toContain("@demo.invalid");
+    } finally {
+      spy.mockRestore();
+      config.ANALYTICS_BUCKET = previous;
+    }
+  });
+  it("keeps resource locations private until an administrator explicitly publishes them", async () => {
+    const r = (
+      await post(admin, "/admin/resources", {
+        name: "Test shelter capacity",
+        type: "SHELTER",
+        departmentId: authority.user.department_id,
+        jurisdictionId: authority.user.jurisdiction_id,
+        quantity: 20,
+      }).expect(201)
+    ).body;
+    const b = {
+      latitude: 19.076,
+      longitude: 72.8777,
+      address: "Controlled test site",
+      publiclyListed: false,
+    };
+    const patch = (c: Client, payload: any) =>
+      c.agent
+        .patch(`/api/v1/admin/resources/${r.id}/location`)
+        .set("Origin", origin)
+        .set("X-CSRF-Token", c.csrf)
+        .send(payload);
+    await patch(citizen, b).expect(403);
+    await patch(admin, { ...b, latitude: 0, longitude: 0 }).expect(400);
+    await patch(admin, b).expect(200);
+    expect(
+      (
+        await citizen.agent.get("/api/v1/resource-locations").expect(200)
+      ).body.items.map((v: any) => v.id),
+    ).not.toContain(r.id);
+    expect(
+      (
+        await authority.agent.get("/api/v1/resource-locations").expect(200)
+      ).body.items.map((v: any) => v.id),
+    ).toContain(r.id);
+    await patch(admin, { ...b, publiclyListed: true }).expect(200);
+    expect(
+      (
+        await citizen.agent.get("/api/v1/resource-locations").expect(200)
+      ).body.items.map((v: any) => v.id),
+    ).toContain(r.id);
+    await patch(admin, {
+      ...b,
+      latitude: null,
+      longitude: null,
+      publiclyListed: true,
+    }).expect(400);
+    await patch(admin, { ...b, latitude: null, longitude: null }).expect(200);
+    expect(
+      (
+        await citizen.agent.get("/api/v1/resource-locations").expect(200)
+      ).body.items.map((v: any) => v.id),
+    ).not.toContain(r.id);
+  });
+  it("uses a bounded authenticated address search and reports missing provider configuration (SDK stub)", async () => {
+    await request(app).get("/api/v1/locations/search?q=Mumbai").expect(401);
+    await citizen.agent.get("/api/v1/locations/search?q=Mumbai").expect(503);
+    const previous = config.LOCATION_PLACE_INDEX;
+    config.LOCATION_PLACE_INDEX = "test-index";
+    const spy = vi
+      .spyOn(LocationClient.prototype, "send")
+      .mockResolvedValue({
+        Results: [
+          {
+            Place: {
+              Label: "Test result",
+              Geometry: { Point: [72.8777, 19.076] },
+            },
+          },
+        ],
+      } as never);
+    try {
+      const r = await citizen.agent
+        .get("/api/v1/locations/search?q=Mumbai")
+        .expect(200);
+      expect(r.body.items).toEqual([
+        { label: "Test result", longitude: 72.8777, latitude: 19.076 },
+      ]);
+      expect((spy.mock.calls[0][0] as any).input.MaxResults).toBe(5);
+      await citizen.agent.get("/api/v1/locations/search?q=a").expect(400);
+    } finally {
+      spy.mockRestore();
+      config.LOCATION_PLACE_INDEX = previous;
+    }
   });
   it("renews local sessions and revokes suspended users immediately", async () => {
     await pool.query(

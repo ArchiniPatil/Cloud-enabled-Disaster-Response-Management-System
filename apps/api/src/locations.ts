@@ -7,6 +7,7 @@ import {
   GetMapTileCommand,
   GetMapGlyphsCommand,
   GetMapSpritesCommand,
+  SearchPlaceIndexForTextCommand,
 } from "@aws-sdk/client-location";
 import {
   coordinateSchema,
@@ -19,6 +20,31 @@ import { config } from "./config.js";
 const location = new LocationClient({ region: config.AWS_REGION });
 const uuid = z.string().uuid();
 export const locationsRouter = Router();
+locationsRouter.get("/search", async (req, res) => {
+  if (!config.LOCATION_PLACE_INDEX)
+    fail(
+      503,
+      "SEARCH_UNCONFIGURED",
+      "Address search is unavailable. Use GPS or enter coordinates.",
+    );
+  const text = z.string().trim().min(3).max(200).parse(req.query.q);
+  const result = await location.send(
+    new SearchPlaceIndexForTextCommand({
+      IndexName: config.LOCATION_PLACE_INDEX,
+      Text: text,
+      MaxResults: 5,
+    }),
+  );
+  res.json({
+    items: (result.Results ?? [])
+      .filter((r) => r.Place?.Geometry?.Point?.length === 2)
+      .map((r) => ({
+        label: r.Place!.Label,
+        longitude: r.Place!.Geometry!.Point![0],
+        latitude: r.Place!.Geometry!.Point![1],
+      })),
+  });
+});
 locationsRouter.post("/sessions", requireRole("RESCUER"), async (req, res) => {
   const { teamId } = z.object({ teamId: uuid }).strict().parse(req.body);
   res.status(201).json(

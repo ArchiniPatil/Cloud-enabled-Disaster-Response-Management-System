@@ -49,3 +49,7 @@ Two AZs; public ALB/NAT subnets, private application subnets, isolated database 
 A dedicated deployment migration Lambda uses the database owner secret. ECS and the worker get a separate `response_app` login, without schema creation, role creation, audit mutation, or migration-table writes. Migration completion is a dependency of ECS service deployment. The system uses TLS certificate validation and the official RDS CA bundle. No database or application secrets appear in frontend configuration or outputs.
 
 See deployment and operations documents for external prerequisites and failure behavior.
+
+## Academic default-hostname variant
+
+`hosting=academic` defines Amplify's default HTTPS origin and an API Gateway HTTP API with a VPC Link to an internal ALB and private ECS tasks. It uses authenticated polling rather than SSE to respect gateway timeouts. The VPC Link/ALB/task hops are private HTTP; public ingress and RDS use TLS. This classroom tradeoff is distinct from an end-to-end TLS deployment claim. `infra/identity.ts` alternatively defines only Cognito for the isolated local real-account workflow. See ACADEMIC_DEMO.md for costs, approval and provider acceptance boundaries.

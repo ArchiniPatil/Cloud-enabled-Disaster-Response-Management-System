@@ -11,7 +11,23 @@ import { pool, transaction, audit } from "./db.js";
 import { requireRole, permission, fail, page } from "./http.js";
 import { teamAccess, incidentAccess, scopeSQL, scopeParams } from "./policy.js";
 import { config } from "./config.js";
+import { management } from "./management.js";
 export const operations = Router();
+operations.get("/resource-locations", async (req, res) => {
+  res.json({
+    items: (
+      await pool.query(
+        `SELECT r.id,r.name,r.type,r.address,r.quantity,r.status,r.publicly_listed,ST_Y(r.location::geometry) latitude,ST_X(r.location::geometry) longitude,coalesce((SELECT sum(quantity)::int FROM resource_allocations a WHERE a.resource_id=r.id AND released_at IS NULL),0) allocated FROM resources r WHERE r.location IS NOT NULL AND (r.publicly_listed OR $1='ADMIN' OR ($1='AUTHORITY' AND r.department_id=$2 AND r.jurisdiction_id=$3) OR ($1='RESCUER' AND EXISTS(SELECT 1 FROM team_memberships WHERE team_id=r.team_id AND user_id=$4))) ORDER BY r.name LIMIT 100`,
+        [
+          req.user.role,
+          req.user.department_id,
+          req.user.jurisdiction_id,
+          req.user.id,
+        ],
+      )
+    ).rows,
+  });
+});
 const uuid = z.string().uuid();
 const cognito = new CognitoIdentityProviderClient({
   region: config.AWS_REGION,
@@ -79,6 +95,23 @@ operations.post(
     await transaction(async (db) => {
       if (req.user.role === "AUTHORITY") permission(req, "DISPATCH");
       const t = await teamAccess(db, req.user, uuid.parse(req.params.id));
+      await db.query("SELECT id FROM rescue_teams WHERE id=$1 FOR UPDATE", [
+        t.id,
+      ]);
+      if (
+        b.availability === "AVAILABLE" &&
+        t.organization_id &&
+        !(
+          await db.query("SELECT 1 FROM organizations WHERE id=$1 AND active", [
+            t.organization_id,
+          ])
+        ).rowCount
+      )
+        fail(
+          409,
+          "ORGANIZATION_INACTIVE",
+          "The team's organization is inactive",
+        );
       await db.query("UPDATE rescue_teams SET availability=$2 WHERE id=$1", [
         t.id,
         b.availability,
@@ -184,6 +217,8 @@ operations.patch(
     const b = announcement
       .extend({ cancelled: z.boolean().default(false) })
       .parse(req.body);
+    if (!b.cancelled && Date.parse(b.expiresAt) <= Date.now())
+      fail(400, "EXPIRY", "Expiry must be in the future");
     await transaction(async (db) => {
       const a = (
         await db.query("SELECT * FROM announcements WHERE id=$1 FOR UPDATE", [
@@ -394,6 +429,7 @@ operations.get(
 );
 
 operations.use("/admin", requireRole("ADMIN"));
+operations.use("/admin", management);
 operations.get("/admin/users", async (req, res) => {
   const p = page(req);
   res.json({
@@ -408,7 +444,7 @@ operations.get("/admin/users", async (req, res) => {
 operations.post("/admin/users", async (req, res) => {
   const b = z
     .object({
-      email: z.email(),
+      email: z.email().transform((v) => v.trim().toLowerCase()),
       name: z.string().min(2).max(100),
       role: z.enum(["AUTHORITY", "RESCUER"]),
       departmentId: uuid,
@@ -421,6 +457,14 @@ operations.post("/admin/users", async (req, res) => {
     })
     .strict()
     .parse(req.body);
+  if (b.role === "RESCUER" && b.permissions.length)
+    fail(
+      400,
+      "ROLE_PERMISSIONS",
+      "Rescue accounts cannot receive dispatcher permissions",
+    );
+  if (b.role === "AUTHORITY" && b.teamId)
+    fail(400, "ROLE_TEAM", "Only rescue accounts can join a team");
   if (!config.COGNITO_POOL_ID)
     fail(
       503,
@@ -454,17 +498,30 @@ operations.post("/admin/users", async (req, res) => {
     )
       fail(400, "TEAM", "Team does not match organization");
   });
-  const created = await cognito.send(
-    new AdminCreateUserCommand({
-      UserPoolId: config.COGNITO_POOL_ID,
-      Username: b.email,
-      UserAttributes: [
-        { Name: "email", Value: b.email },
-        { Name: "name", Value: b.name },
-      ],
-      DesiredDeliveryMediums: ["EMAIL"],
-    }),
-  );
+  let created;
+  try {
+    created = await cognito.send(
+      new AdminCreateUserCommand({
+        UserPoolId: config.COGNITO_POOL_ID,
+        Username: b.email,
+        UserAttributes: [
+          { Name: "email", Value: b.email },
+          { Name: "name", Value: b.name },
+          // Cognito generates and emails the temporary password; first sign-in proves inbox access.
+          { Name: "email_verified", Value: "true" },
+        ],
+        DesiredDeliveryMediums: ["EMAIL"],
+      }),
+    );
+  } catch (error) {
+    if ((error as Error).name === "UsernameExistsException")
+      fail(
+        409,
+        "IDENTITY_EXISTS",
+        "This identity already exists. Use the existing operational account's resend invitation or password recovery; do not create a duplicate.",
+      );
+    throw error;
+  }
   const sub = created.User?.Attributes?.find((a) => a.Name === "sub")?.Value;
   if (!sub)
     fail(
@@ -562,6 +619,7 @@ operations.post("/admin/teams", async (req, res) => {
   const b = z
     .object({
       name: z.string().min(2).max(100),
+      organizationId: uuid.optional(),
       departmentId: uuid,
       jurisdictionId: uuid,
       capacity: z.number().int().min(1).max(5).default(1),
@@ -572,10 +630,27 @@ operations.post("/admin/teams", async (req, res) => {
     .parse(req.body);
   res.status(201).json(
     await transaction(async (db) => {
+      if (
+        b.organizationId &&
+        !(
+          await db.query(
+            "SELECT 1 FROM organizations WHERE id=$1 AND active FOR SHARE",
+            [b.organizationId],
+          )
+        ).rowCount
+      )
+        fail(400, "ORGANIZATION", "Select an active organization");
       const t = (
         await db.query(
-          "INSERT INTO rescue_teams(name,department_id,jurisdiction_id,capacity,vehicle) VALUES($1,$2,$3,$4,$5) RETURNING id",
-          [b.name, b.departmentId, b.jurisdictionId, b.capacity, b.vehicle],
+          "INSERT INTO rescue_teams(name,department_id,jurisdiction_id,capacity,vehicle,organization_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id",
+          [
+            b.name,
+            b.departmentId,
+            b.jurisdictionId,
+            b.capacity,
+            b.vehicle,
+            b.organizationId ?? null,
+          ],
         )
       ).rows[0];
       for (const cap of new Set(b.capabilities))

@@ -67,3 +67,9 @@ Suspension increments session version, deletes sessions, stops location sharing,
 ## Deployment rollback / cleanup
 
 Use the previous tested immutable image/task definition for application rollback. Do not reverse a schema migration blindly. ECS circuit breaker handles failed task health. Follow `DEPLOYMENT.md` for guarded cleanup. Retained RDS, snapshots, buckets, identity pools, logs, ECR and bootstrap assets can keep billing after stack deletion; inspect individually and obtain approval before data destruction.
+
+## Classroom demonstration lifecycle
+
+See ACADEMIC_DEMO.md for the proposed 24-hour credit-funded window, account checks, manual frontend publication, signup/bootstrap/invitations and cleanup inventory. Budget alerts measure gross consumption without credit offsets but are delayed alerts, not caps. Stopping the application does not remove retained databases, snapshots, buckets, images, logs or secrets.
+
+Notification Health shows attempts and permits only bounded retries for definitive failures. Reconcile unknown submissions with the provider. SMS delivery receipts can arrive before submission persistence and are reconciled when the provider ID is recorded; duplicate receipts do not duplicate the delivered transition. Organization deactivation blocks duty and stops location sessions. Daily analytics are point-in-time exports; later changes do not silently rewrite previously exported days.

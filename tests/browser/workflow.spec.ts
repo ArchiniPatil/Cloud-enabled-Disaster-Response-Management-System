@@ -107,6 +107,13 @@ test("mobile report form, persistent session and explicit integration failures",
   await expect(p.getByLabel("Longitude", { exact: true })).toHaveValue(
     "72.8777",
   );
+  await p
+    .getByRole("button", { name: "Choose on map or search address" })
+    .click();
+  await expect(
+    p.getByText("Amazon Location map is not configured", { exact: true }),
+  ).toBeVisible();
+  await expect(p.getByLabel("Latitude", { exact: true })).toHaveValue("19.076");
   expect(
     await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBe(true);
@@ -157,4 +164,73 @@ test("administrator configures departments and jurisdictions through protected f
     }),
   ).toBeVisible();
   await context.close();
+});
+
+test("administrator manages an organization and authority corrects a notice and views metrics", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const page = await login(context, "Admin");
+  await page.getByRole("link", { name: "Administration", exact: true }).click();
+  await page.getByRole("button", { name: "Teams", exact: true }).click();
+  const form = page.locator("form").filter({
+    has: page.getByRole("heading", { name: "Organization", exact: true }),
+  });
+  const name = `Browser organization ${Date.now()}`;
+  await form.getByLabel("Organization name").fill(name);
+  await form
+    .getByRole("button", { name: "Save organization", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: `Organization: ${name}`, exact: true }),
+  ).toBeVisible();
+  await context.close();
+  const authorityContext = await browser.newContext();
+  const authority = await login(authorityContext, "Authority");
+  await authority
+    .getByRole("link", { name: "Announcements", exact: true })
+    .click();
+  await authority
+    .getByRole("button", { name: "Publish notice", exact: true })
+    .click();
+  const title = `Controlled browser notice ${Date.now()}`;
+  await authority.getByLabel("Title", { exact: true }).fill(title);
+  await authority
+    .getByLabel("Message", { exact: true })
+    .fill("Controlled browser announcement; no real emergency.");
+  const expires = new Date(Date.now() + 86400000);
+  await authority
+    .getByLabel("Expires at")
+    .fill(
+      new Date(expires.getTime() - expires.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16),
+    );
+  await authority
+    .getByRole("button", { name: "Publish announcement", exact: true })
+    .click();
+  let article = authority.locator("article").filter({
+    has: authority.getByRole("heading", { name: title, exact: true }),
+  });
+  await article.getByRole("button", { name: "Correct notice" }).click();
+  await authority
+    .getByLabel("Title", { exact: true })
+    .fill(`${title} corrected`);
+  await authority.getByRole("button", { name: "Save correction" }).click();
+  article = authority.locator("article").filter({
+    has: authority.getByRole("heading", {
+      name: `${title} corrected`,
+      exact: true,
+    }),
+  });
+  authority.once("dialog", (dialog) => dialog.accept());
+  await article.getByRole("button", { name: "Withdraw notice" }).click();
+  await expect(article).toHaveCount(0);
+  await authority
+    .getByRole("link", { name: "Operational metrics", exact: true })
+    .click();
+  await expect(
+    authority.getByRole("heading", { name: "Team workload" }),
+  ).toBeVisible();
+  await authorityContext.close();
 });

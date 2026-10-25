@@ -7,6 +7,8 @@ import {
   CfnOutput,
   CfnParameter,
   aws_ec2 as ec2,
+  aws_apigatewayv2 as apigateway,
+  aws_apigatewayv2_integrations as apiIntegrations,
   aws_ecs as ecs,
   aws_ecs_patterns as patterns,
   aws_ecr as ecr,
@@ -22,6 +24,7 @@ import {
   aws_iam as iam,
   aws_secretsmanager as secrets,
   aws_logs as logs,
+  aws_logs_destinations as logDestinations,
   aws_cloudwatch as cw,
   aws_cloudwatch_actions as cwActions,
   aws_certificatemanager as acm,
@@ -58,26 +61,66 @@ export class ResponseStack extends Stack {
     Tags.of(this).add("Project", "DisasterResponse");
     Tags.of(this).add("Environment", stage);
     Tags.of(this).add("ManagedBy", "CDK");
-    const frontend = new CfnParameter(this, "FrontendOrigin", {
-      description:
-        "HTTPS origin of Amplify custom domain; must share a registrable domain with the API",
-      allowedPattern: "https://[^/]+",
-      type: "String",
-    });
-    const apiOrigin = new CfnParameter(this, "ApiOrigin", {
-      description: "HTTPS API origin on your domain",
-      allowedPattern: "https://[^/]+",
-      type: "String",
-    });
-    const certificate = new CfnParameter(this, "ApiCertificateArn", {
-      description: "Existing ACM certificate ARN in this region",
-      type: "String",
-      allowedPattern: "arn:aws:acm:.*",
-    });
+    const academic = this.node.tryGetContext("hosting") === "academic";
+    const resourceSuffix = academic ? "academic" : stage;
+    if (academic) Tags.of(this).add("Environment", "academic");
+    if (academic && prod)
+      throw new Error(
+        "Academic hosting is a development-only demonstration configuration",
+      );
+    const gateway = academic
+      ? new apigateway.HttpApi(this, "AcademicGateway", {
+          apiName: "response-academic",
+        })
+      : undefined;
+    const academicHosting = academic
+      ? new amplify.CfnApp(this, "AcademicFrontend", {
+          name: "response-academic",
+          platform: "WEB",
+          customRules: [
+            {
+              source: "/api/<*>",
+              target: `${gateway!.apiEndpoint}/api/<*>`,
+              status: "200",
+            },
+            { source: "/<*>", target: "/index.html", status: "404-200" },
+          ],
+        })
+      : undefined;
+    const frontend = academic
+      ? { valueAsString: `https://dev.${academicHosting!.attrDefaultDomain}` }
+      : new CfnParameter(this, "FrontendOrigin", {
+          description:
+            "HTTPS origin of Amplify custom domain; must share a registrable domain with the API",
+          allowedPattern: "https://[^/]+",
+          type: "String",
+        });
+    const apiOrigin = academic
+      ? { valueAsString: gateway!.apiEndpoint }
+      : new CfnParameter(this, "ApiOrigin", {
+          description: "HTTPS API origin on your domain",
+          allowedPattern: "https://[^/]+",
+          type: "String",
+        });
+    const certificate = academic
+      ? undefined
+      : new CfnParameter(this, "ApiCertificateArn", {
+          description: "Existing ACM certificate ARN in this region",
+          type: "String",
+          allowedPattern: "arn:aws:acm:.*",
+        });
     const budgetEmail = new CfnParameter(this, "BudgetEmail", {
       type: "String",
       description:
         "Verified operations email for budget alerts; no SMS destination",
+    });
+    const budgetAmount = new CfnParameter(this, "BudgetAmount", {
+      type: "Number",
+      default: academic ? 30 : prod ? 350 : 200,
+      minValue: 1,
+      maxValue: 10000,
+      description:
+        "Gross usage alert threshold in USD; not a hard spending cap",
     });
     const vpc = new ec2.Vpc(this, "Network", {
       maxAzs: 2,
@@ -113,7 +156,7 @@ export class ResponseStack extends Stack {
       credentials: rds.Credentials.fromGeneratedSecret("response_admin"),
       storageEncrypted: true,
       allocatedStorage: 20,
-      maxAllocatedStorage: 100,
+      maxAllocatedStorage: academic ? 20 : 100,
       storageType: rds.StorageType.GP3,
       multiAz: prod,
       publiclyAccessible: false,
@@ -212,7 +255,9 @@ export class ResponseStack extends Stack {
       preventUserExistenceErrors: true,
     });
     const domain = pool.addDomain("HostedLogin", {
-      cognitoDomain: { domainPrefix: `response-${this.account}-${stage}` },
+      cognitoDomain: {
+        domainPrefix: `response-${this.account}-${resourceSuffix}`,
+      },
     });
     const eventTopic = new sns.Topic(this, "IncidentEvents", {
       enforceSSL: true,
@@ -232,17 +277,23 @@ export class ResponseStack extends Stack {
       new subscriptions.SqsSubscription(queue, { rawMessageDelivery: true }),
     );
     const map = new location.CfnMap(this, "Map", {
-      mapName: `response-${stage}`,
+      mapName: `response-${resourceSuffix}`,
       configuration: { style: "VectorEsriNavigation" },
       description: "Authorized operational map",
     });
     const route = new location.CfnRouteCalculator(this, "Routes", {
-      calculatorName: `response-${stage}`,
+      calculatorName: `response-${resourceSuffix}`,
       dataSource: "Esri",
+    });
+    const places = new location.CfnPlaceIndex(this, "Places", {
+      indexName: `response-${resourceSuffix}`,
+      dataSource: "Esri",
+      dataSourceConfiguration: { intendedUse: "Storage" },
     });
     const environment: Record<string, string> = {
       NODE_ENV: "production",
       AUTH_MODE: "cognito",
+      REALTIME_TRANSPORT: academic ? "poll" : "sse",
       AWS_REGION: this.region,
       PORT: "4000",
       APP_ORIGIN: frontend.valueAsString,
@@ -255,6 +306,7 @@ export class ResponseStack extends Stack {
       EVIDENCE_BUCKET: evidence.bucketName,
       EVENT_TOPIC_ARN: eventTopic.topicArn,
       LOCATION_MAP_NAME: map.ref,
+      LOCATION_PLACE_INDEX: places.ref,
       LOCATION_ROUTE_CALCULATOR: route.ref,
       SMS_ENABLED: "false",
       LOCATION_RETENTION_HOURS: "24",
@@ -276,16 +328,19 @@ export class ResponseStack extends Stack {
         cpu: 256,
         memoryLimitMiB: 512,
         desiredCount: prod ? 2 : 1,
-        publicLoadBalancer: true,
+        publicLoadBalancer: !academic,
+        openListener: !academic,
         taskSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
         assignPublicIp: false,
-        certificate: acm.Certificate.fromCertificateArn(
-          this,
-          "Certificate",
-          certificate.valueAsString,
-        ),
-        redirectHTTP: true,
-        listenerPort: 443,
+        certificate: certificate
+          ? acm.Certificate.fromCertificateArn(
+              this,
+              "Certificate",
+              certificate.valueAsString,
+            )
+          : undefined,
+        redirectHTTP: !academic,
+        listenerPort: academic ? 80 : 443,
         healthCheckGracePeriod: Duration.seconds(90),
         circuitBreaker: { rollback: true },
         taskImageOptions: {
@@ -304,6 +359,36 @@ export class ResponseStack extends Stack {
         maxHealthyPercent: 200,
       },
     );
+    if (gateway) {
+      const linkSecurity = new ec2.SecurityGroup(this, "GatewayLinkSecurity", {
+        vpc,
+      });
+      const link = new apigateway.VpcLink(this, "GatewayLink", {
+        vpc,
+        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        securityGroups: [linkSecurity],
+      });
+      service.loadBalancer.connections.allowFrom(
+        linkSecurity,
+        ec2.Port.tcp(80),
+      );
+      gateway.addRoutes({
+        path: "/api/{proxy+}",
+        methods: [apigateway.HttpMethod.ANY],
+        integration: new apiIntegrations.HttpAlbIntegration(
+          "PrivateApi",
+          service.listener,
+          {
+            vpcLink: link,
+            parameterMapping: new apigateway.ParameterMapping().overwritePath(
+              apigateway.MappingValue.requestPath(),
+            ),
+          },
+        ),
+      });
+      new CfnOutput(this, "ApplicationUrl", { value: frontend.valueAsString });
+      new CfnOutput(this, "ApiUrl", { value: gateway.apiEndpoint });
+    }
     service.targetGroup.configureHealthCheck({
       path: "/api/v1/health/ready",
       healthyHttpCodes: "200",
@@ -345,12 +430,73 @@ export class ResponseStack extends Stack {
           beforeBundling: () => [],
           beforeInstall: () => [],
           afterBundling: (_input, output) => [
-            `mkdir -p '${output}/certs'`,
-            `if [ -f certs/rds-global.pem ]; then cp certs/rds-global.pem '${output}/certs/rds-global.pem'; fi`,
+            `node scripts/cdk-assets.mjs "${output}"`,
           ],
         },
       },
     });
+    const receiptGroups: string[] = String(
+      this.node.tryGetContext("smsDeliveryLogs") ?? "",
+    )
+      .split(",")
+      .filter(Boolean);
+    if (receiptGroups.length) {
+      if (
+        receiptGroups.length > 2 ||
+        receiptGroups.some(
+          (n) =>
+            !/^sns\/[a-z0-9-]+\/[0-9]{12}\/DirectPublishToPhoneNumber(?:\/Failure)?$/.test(
+              n,
+            ),
+        )
+      )
+        throw new Error(
+          "Supply only the reviewed SNS SMS success/failure log group names",
+        );
+      const receipts = new nodejs.NodejsFunction(this, "SmsReceipts", {
+        entry: "apps/api/src/sms-receipts.ts",
+        handler: "handler",
+        runtime: lambda.Runtime.NODEJS_22_X,
+        timeout: Duration.seconds(30),
+        memorySize: 256,
+        vpc,
+        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        environment: {
+          ...workerEnvironment,
+          SMS_RECEIPT_LOG_GROUPS: receiptGroups.join(","),
+        },
+        logRetention: logs.RetentionDays.ONE_MONTH,
+        bundling: {
+          format: nodejs.OutputFormat.ESM,
+          target: "node22",
+          externalModules: ["pg-native"],
+          banner:
+            "import { createRequire } from 'module';const require = createRequire(import.meta.url);",
+          commandHooks: {
+            beforeBundling: () => [],
+            beforeInstall: () => [],
+            afterBundling: (_input, output) => [
+              `node scripts/cdk-assets.mjs "${output}"`,
+            ],
+          },
+        },
+      });
+      db.connections.allowDefaultPortFrom(receipts);
+      appDatabaseSecret.grantRead(receipts);
+      sessionSecret.grantRead(receipts);
+      receiptGroups.forEach(
+        (name, index) =>
+          new logs.SubscriptionFilter(this, `SmsReceiptSubscription${index}`, {
+            logGroup: logs.LogGroup.fromLogGroupName(
+              this,
+              `SmsProviderLog${index}`,
+              name,
+            ),
+            destination: new logDestinations.LambdaDestination(receipts),
+            filterPattern: logs.FilterPattern.allEvents(),
+          }),
+      );
+    }
     const migrationEnvironment = {
       ...workerEnvironment,
       DATABASE_SECRET_ARN: db.secret!.secretArn,
@@ -378,10 +524,7 @@ export class ResponseStack extends Stack {
           beforeBundling: () => [],
           beforeInstall: () => [],
           afterBundling: (_input, output) => [
-            `mkdir -p '${output}/certs'`,
-            `if [ -f certs/rds-global.pem ]; then cp certs/rds-global.pem '${output}/certs/rds-global.pem'; fi`,
-            `cp -R db '${output}/db'`,
-            `chmod -R a+rX '${output}'`,
+            `node scripts/cdk-assets.mjs "${output}" --database`,
           ],
         },
       },
@@ -452,11 +595,18 @@ export class ResponseStack extends Stack {
       new iam.PolicyStatement({
         actions: [
           "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminGetUser",
           "cognito-idp:AdminDisableUser",
           "cognito-idp:AdminEnableUser",
           "cognito-idp:AdminUserGlobalSignOut",
         ],
         resources: [pool.userPoolArn],
+      }),
+    );
+    service.taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["geo:SearchPlaceIndexForText"],
+        resources: [places.attrArn],
       }),
     );
     service.taskDefinition.taskRole.addToPrincipalPolicy(
@@ -513,7 +663,7 @@ export class ResponseStack extends Stack {
       new subscriptions.EmailSubscription(budgetEmail.valueAsString),
     );
     const dashboard = new cw.Dashboard(this, "OperationsDashboard", {
-      dashboardName: `response-${stage}`,
+      dashboardName: `response-${resourceSuffix}`,
     });
     dashboard.addWidgets(
       new cw.GraphWidget({
@@ -548,10 +698,11 @@ export class ResponseStack extends Stack {
     });
     new budgets.CfnBudget(this, "CostBudget", {
       budget: {
-        budgetName: `response-${stage}`,
+        budgetName: `response-${resourceSuffix}`,
         budgetType: "COST",
         timeUnit: "MONTHLY",
-        budgetLimit: { amount: prod ? 350 : 200, unit: "USD" },
+        budgetLimit: { amount: budgetAmount.valueAsNumber, unit: "USD" },
+        costTypes: { includeCredit: false, includeRefund: false },
         costFilters: { TagKeyValue: [`user:Project$DisasterResponse`] },
       },
       notificationsWithSubscribers: [
@@ -568,20 +719,22 @@ export class ResponseStack extends Stack {
         },
       ],
     });
-    const hosting = new amplify.CfnApp(this, "Frontend", {
-      name: `response-${stage}`,
-      platform: "WEB",
-      buildSpec:
-        'version: 1\nfrontend:\n  phases:\n    preBuild:\n      commands:\n        - npm ci\n    build:\n      commands:\n        - npm run build -w apps/web\n  artifacts:\n    baseDirectory: apps/web/dist\n    files:\n      - "**/*"\n  cache:\n    paths:\n      - node_modules/**/*',
-      customRules: [
-        {
-          source: "/api/<*>",
-          target: `${apiOrigin.valueAsString}/api/<*>`,
-          status: "200",
-        },
-        { source: "/<*>", target: "/index.html", status: "404-200" },
-      ],
-    });
+    const hosting =
+      academicHosting ??
+      new amplify.CfnApp(this, "Frontend", {
+        name: `response-${resourceSuffix}`,
+        platform: "WEB",
+        buildSpec:
+          'version: 1\nfrontend:\n  phases:\n    preBuild:\n      commands:\n        - npm ci\n    build:\n      commands:\n        - npm run build -w apps/web\n  artifacts:\n    baseDirectory: apps/web/dist\n    files:\n      - "**/*"\n  cache:\n    paths:\n      - node_modules/**/*',
+        customRules: [
+          {
+            source: "/api/<*>",
+            target: `${apiOrigin.valueAsString}/api/<*>`,
+            status: "200",
+          },
+          { source: "/<*>", target: "/index.html", status: "404-200" },
+        ],
+      });
     new amplify.CfnBranch(this, "FrontendBranch", {
       appId: hosting.attrAppId,
       branchName: stage,
@@ -606,7 +759,7 @@ export class ResponseStack extends Stack {
       worker.addEnvironment("ANALYTICS_BUCKET", analytics.bucketName);
       const database = new glue.CfnDatabase(this, "AnalyticsCatalog", {
         catalogId: this.account,
-        databaseInput: { name: `response_${stage}` },
+        databaseInput: { name: `response_${resourceSuffix}` },
       });
       new glue.CfnTable(this, "IncidentAnalytics", {
         catalogId: this.account,
@@ -630,12 +783,61 @@ export class ResponseStack extends Stack {
               { name: "status", type: "string" },
               { name: "incident_count", type: "int" },
               { name: "age_seconds", type: "double" },
+              { name: "acknowledgement_seconds", type: "double" },
+              { name: "arrival_seconds", type: "double" },
+              { name: "resolution_seconds", type: "double" },
+              { name: "escalated_count", type: "int" },
             ],
           },
         },
       });
+      for (const [dataset, columns] of [
+        [
+          "teams",
+          [
+            { name: "availability", type: "string" },
+            { name: "team_count", type: "int" },
+            { name: "capacity", type: "int" },
+            { name: "active_assignments", type: "int" },
+            { name: "completed_assignments", type: "int" },
+          ],
+        ],
+        [
+          "resources",
+          [
+            { name: "type", type: "string" },
+            { name: "status", type: "string" },
+            { name: "quantity", type: "int" },
+            { name: "allocated", type: "int" },
+          ],
+        ],
+      ] as const)
+        new glue.CfnTable(this, `${dataset}Analytics`, {
+          catalogId: this.account,
+          databaseName: database.ref,
+          tableInput: {
+            name: `${dataset}_daily`,
+            tableType: "EXTERNAL_TABLE",
+            parameters: { classification: "json" },
+            storageDescriptor: {
+              location: analytics.s3UrlForObject(`${dataset}/`),
+              inputFormat: "org.apache.hadoop.mapred.TextInputFormat",
+              outputFormat:
+                "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+              serdeInfo: {
+                serializationLibrary: "org.openx.data.jsonserde.JsonSerDe",
+              },
+              columns: [
+                { name: "day", type: "string" },
+                { name: "snapshot_at", type: "string" },
+                { name: "department_id", type: "string" },
+                ...columns,
+              ],
+            },
+          },
+        });
       new athena.CfnWorkGroup(this, "AnalyticsWorkgroup", {
-        name: `response-${stage}`,
+        name: `response-${resourceSuffix}`,
         workGroupConfiguration: {
           bytesScannedCutoffPerQuery: 1_000_000_000,
           enforceWorkGroupConfiguration: true,
@@ -668,7 +870,7 @@ export class ResponseStack extends Stack {
       });
       imageRepo.grantPullPush(project);
       const pipeline = new codepipeline.Pipeline(this, "DeliveryPipeline", {
-        pipelineName: `response-${stage}`,
+        pipelineName: `response-${resourceSuffix}`,
         pipelineType: codepipeline.PipelineType.V1,
         restartExecutionOnUpdate: false,
       });
@@ -740,5 +942,5 @@ const app = new App({
 });
 new ResponseStack(
   app,
-  `DisasterResponse-${app.node.tryGetContext("stage") ?? "dev"}`,
+  `DisasterResponse-${app.node.tryGetContext("hosting") === "academic" ? "academic" : (app.node.tryGetContext("stage") ?? "dev")}`,
 );

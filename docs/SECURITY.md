@@ -28,3 +28,11 @@ Live Cognito registration/MFA/renewal/revocation, RDS restore, S3 permissions an
 No independent penetration test, high-load test, official emergency-service integration, regulatory approval, medical triage validation, malicious-image scanner, or operational field validation has occurred. The system is not approved for actual emergency dispatch.
 
 Operational admins can access sensitive records by design. Review governance, audit export, need-to-know permissions and jurisdiction-specific retention before real personal data is introduced. Public situation entries omit identity, free text, photos, IDs and exact location; sensitive categories are never published.
+
+## Academic additions
+
+The identity-only local workflow uses a separate unseeded database and ignored encryption-key file; it never enables fixture logins in Cognito mode. Initial administrator bootstrap still verifies email and TOTP and refuses if an administrator exists. Invitations use Cognito-generated temporary passwords delivered by email; no password is accepted or stored by application provisioning. Invitation resending is limited to pending invitations.
+
+Organization deactivation and team configuration lock records and reject incompatible active assignments. Unpublished resource locations use role/department/jurisdiction/team scope; public listing is an explicit audited administrator action. SMS feedback persists only provider IDs/outcomes from allowlisted log subscriptions.
+
+The academic default-hostname template has HTTPS at Amplify/API Gateway and private HTTP between the gateway, internal ALB and tasks. It is an explicit demonstration tradeoff, not end-to-end transport encryption. Both cloud plans remain undeployed; independent penetration testing and real provider acceptance remain external gates.

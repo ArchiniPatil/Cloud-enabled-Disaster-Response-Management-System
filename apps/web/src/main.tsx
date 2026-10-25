@@ -41,14 +41,21 @@ import {
 import type * as MapLibre from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { api, post, setCsrf, label } from "./api";
-import { etaLabel } from "../../../packages/core/src/domain";
+import { etaLabel, locationState } from "../../../packages/core/src/domain";
 import "./styles.css";
+import { OperationalMetrics } from "./metrics";
+import { ResourceMap } from "./resource-map";
+import { LocationPicker } from "./location-picker";
 import { useData } from "./hooks";
 import {
   ManagementPanels,
   ResourceConsole,
   EvidenceList,
   AccountScopeForm,
+  OrganizationTeams,
+  NotificationPreferences,
+  ResourceLocationForm,
+  NotificationJobs,
 } from "./management";
 type User = {
   id: string;
@@ -56,13 +63,22 @@ type User = {
   email: string;
   role: string;
   department_id: string;
+  jurisdiction_id: string;
   permissions: string[];
 };
 const Session = createContext<{
   user: User | null;
   refresh: () => Promise<void>;
   mode: string;
-}>({ user: null, refresh: async () => {}, mode: "" });
+  identityConfigured: boolean;
+  realtime: string;
+}>({
+  user: null,
+  refresh: async () => {},
+  mode: "",
+  identityConfigured: false,
+  realtime: "sse",
+});
 function ErrorBox({ message }: { message: string }) {
   return message ? (
     <div role="alert" className="notice error">
@@ -110,6 +126,8 @@ function App() {
   const [user, setUser] = useState<User | null>(null),
     [loading, setLoading] = useState(true),
     [mode, setMode] = useState(""),
+    [identityConfigured, setIdentityConfigured] = useState(false),
+    [realtime, setRealtime] = useState("sse"),
     [online, setOnline] = useState(navigator.onLine);
   const refresh = useCallback(async () => {
     try {
@@ -124,7 +142,13 @@ function App() {
     }
   }, []);
   useEffect(() => {
-    void api("/auth/config").then((c) => setMode(c.mode));
+    void api("/auth/config")
+      .then((c) => {
+        setMode(c.mode);
+        setIdentityConfigured(c.identityConfigured);
+        setRealtime(c.realtime);
+      })
+      .catch(() => setMode("unavailable"));
     void refresh();
     const on = () => setOnline(navigator.onLine);
     window.addEventListener("online", on);
@@ -136,7 +160,9 @@ function App() {
   }, [refresh]);
   if (loading) return <div className="loading">Connecting to Response…</div>;
   return (
-    <Session.Provider value={{ user, refresh, mode }}>
+    <Session.Provider
+      value={{ user, refresh, mode, identityConfigured, realtime }}
+    >
       {!online && (
         <div role="alert" className="offline">
           You are offline. Requests cannot be submitted. Use an available
@@ -157,7 +183,7 @@ function App() {
   );
 }
 function Landing() {
-  const { mode, refresh } = useContext(Session),
+  const { mode, refresh, identityConfigured } = useContext(Session),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const navigate = useNavigate();
@@ -194,12 +220,27 @@ function Landing() {
           Report an emergency, coordinate the right teams, and keep the people
           who need help informed.
         </p>
-        <div className="landing-actions">
-          <a className="button primary" href="/api/v1/auth/login">
-            Sign in / Register <ArrowUpRight size={18} />
-          </a>
-          <span>One secure sign-in for every role</span>
-        </div>
+        {identityConfigured ? (
+          <div className="landing-actions">
+            <a className="button primary" href="/api/v1/auth/login">
+              Sign in <ArrowUpRight size={18} />
+            </a>
+            <a className="button" href="/api/v1/auth/register">
+              Create a citizen account
+            </a>
+            <a href="/api/v1/auth/recover">Forgot password?</a>
+            <span>
+              Authority and rescue accounts require an administrator invitation.
+              All accounts use email verification and an authenticator.
+            </span>
+          </div>
+        ) : (
+          <p className="notice">
+            {mode === "demo"
+              ? "Use a demonstration account below. Personal registration becomes available when secure sign-in is configured."
+              : "Sign-in is temporarily unavailable. Please contact the project administrator."}
+          </p>
+        )}
         <div className="notice">
           <ShieldCheck size={20} />
           This platform supports coordination. A submitted request does not
@@ -260,9 +301,12 @@ function Shell() {
     ],
     ["/announcements", "Announcements", <Bell size={19} />],
     ["/situation", "Local situation", <MapPin size={19} />],
+    ["/resource-map", "Shelters & resources", <MapPin size={19} />],
   ];
   if (!citizen)
     links.push(["/teams", "Teams & resources", <Users size={19} />]);
+  if (["ADMIN", "AUTHORITY"].includes(user!.role))
+    links.push(["/metrics", "Operational metrics", <Activity size={19} />]);
   if (user!.role === "ADMIN")
     links.push(["/admin", "Administration", <Settings size={19} />]);
   return (
@@ -323,8 +367,10 @@ function Shell() {
             <Route path="/incidents/:id" element={<IncidentDetail />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/situation" element={<Situation />} />
+            <Route path="/resource-map" element={<ResourceMap />} />
             <Route path="/teams" element={<Teams />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/metrics" element={<OperationalMetrics />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route
@@ -728,6 +774,16 @@ function ReportForm() {
             <span>02</span>
             <h2>Where do you need help?</h2>
           </div>
+          <LocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            onPick={(lat, lon, foundAddress) => {
+              manuallyCorrected.current = true;
+              setLatitude(String(lat));
+              setLongitude(String(lon));
+              if (foundAddress) setAddress(foundAddress);
+            }}
+          />
           <button type="button" onClick={locate}>
             <LocateFixed size={18} />
             Use my current location
@@ -825,7 +881,7 @@ function ReportForm() {
 }
 function IncidentDetail() {
   const { id } = useParams();
-  const { user } = useContext(Session);
+  const { user, realtime } = useContext(Session);
   const { data: i, error, reload } = useData(`/incidents/${id}`);
   const tracking = useData(`/locations/incidents/${id}`);
   const [actionError, setActionError] = useState(""),
@@ -835,6 +891,16 @@ function IncidentDetail() {
     [live, setLive] = useState("Connecting");
   const dispatcher = ["ADMIN", "AUTHORITY"].includes(user!.role);
   useEffect(() => {
+    if (realtime === "poll") {
+      setLive("Updates every 5 seconds");
+      const timer = window.setInterval(() => {
+        if (document.visibilityState === "visible") {
+          void reload();
+          void tracking.reload();
+        }
+      }, 5000);
+      return () => window.clearInterval(timer);
+    }
     const events = new EventSource(`/api/v1/incidents/${id}/events`, {
       withCredentials: true,
     });
@@ -849,7 +915,7 @@ function IncidentDetail() {
     });
     events.onerror = () => setLive("Updates interrupted — retrying");
     return () => events.close();
-  }, [id, reload, tracking.reload]);
+  }, [id, realtime, reload, tracking.reload]);
   async function act(path: string, body: unknown) {
     setBusy(true);
     setActionError("");
@@ -1183,7 +1249,15 @@ function Tracking({ data, error }: { data: any; error: string }) {
       {data?.teams.map((t: any) => (
         <div className="tracking-row" key={t.id}>
           <strong>{t.name}</strong>
-          <Badge value={t.tracking} />
+          <Badge
+            value={
+              error
+                ? "UNAVAILABLE"
+                : t.location_at
+                  ? locationState(t.location_at, t.accuracy)
+                  : "UNAVAILABLE"
+            }
+          />
           <p>
             {t.latitude != null
               ? `${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}`
@@ -1194,7 +1268,10 @@ function Tracking({ data, error }: { data: any; error: string }) {
               : "none"}
           </p>
           <p>
-            {t.route
+            {t.route &&
+            !error &&
+            t.location_at &&
+            locationState(t.location_at, t.accuracy) === "LIVE"
               ? `${(t.route.distance_m / 1000).toFixed(1)} km by road · ${etaLabel(t.route.duration_s)}`
               : `${t.straight_line_m != null ? (t.straight_line_m / 1000).toFixed(1) + " km straight-line · " : ""}ETA unavailable`}
           </p>
@@ -1409,23 +1486,43 @@ function Announcements() {
   const { user } = useContext(Session),
     { data, error, reload } = useData("/announcements");
   const [create, setCreate] = useState(false),
+    [editing, setEditing] = useState<any>(null),
+    [saving, setSaving] = useState(false),
     [actionError, setActionError] = useState("");
-  const allowed = ["AUTHORITY", "ADMIN"].includes(user!.role);
+  const allowed =
+    user!.role === "ADMIN" ||
+    (user!.role === "AUTHORITY" && user!.permissions.includes("ANNOUNCE"));
+  const canEdit = (a: any) =>
+    allowed &&
+    (user!.role === "ADMIN" ||
+      (a.department_id === user!.department_id &&
+        a.jurisdiction_id === user!.jurisdiction_id));
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    setSaving(true);
+    setActionError("");
     try {
-      await post("/announcements", {
+      const payload = {
         title: f.get("title"),
         body: f.get("body"),
         audience: f.get("audience"),
         importance: f.get("importance"),
         expiresAt: new Date(String(f.get("expires"))).toISOString(),
-      });
+      };
+      if (editing)
+        await api(`/announcements/${editing.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      else await post("/announcements", payload);
+      setEditing(null);
       setCreate(false);
       await reload();
     } catch (e) {
       setActionError((e as Error).message);
+    } finally {
+      setSaving(false);
     }
   }
   return (
@@ -1435,7 +1532,13 @@ function Announcements() {
         description="Current notices published by authorized platform personnel."
       >
         {allowed && (
-          <button className="primary" onClick={() => setCreate(!create)}>
+          <button
+            className="primary"
+            onClick={() => {
+              setEditing(null);
+              setCreate(!create);
+            }}
+          >
             <Plus size={17} />
             Publish notice
           </button>
@@ -1443,19 +1546,35 @@ function Announcements() {
       </PageHead>
       <ErrorBox message={error || actionError} />
       {create && (
-        <form className="panel" onSubmit={submit}>
+        <form className="panel" onSubmit={submit} key={editing?.id ?? "new"}>
+          <h2>{editing ? "Correct announcement" : "New announcement"}</h2>
           <label>
             Title
-            <input name="title" minLength={3} maxLength={150} required />
+            <input
+              name="title"
+              defaultValue={editing?.title ?? ""}
+              minLength={3}
+              maxLength={150}
+              required
+            />
           </label>
           <label>
             Message
-            <textarea name="body" minLength={5} maxLength={3000} required />
+            <textarea
+              name="body"
+              defaultValue={editing?.body ?? ""}
+              minLength={5}
+              maxLength={3000}
+              required
+            />
           </label>
           <div className="two-columns">
             <label>
               Audience
-              <select name="audience">
+              <select
+                name="audience"
+                defaultValue={editing?.audience ?? "EVERYONE"}
+              >
                 <option value="EVERYONE">Everyone</option>
                 <option value="AUTHORITIES_ONLY">
                   Authorities in my department & jurisdiction
@@ -1464,7 +1583,10 @@ function Announcements() {
             </label>
             <label>
               Importance
-              <select name="importance">
+              <select
+                name="importance"
+                defaultValue={editing?.importance ?? "INFORMATION"}
+              >
                 <option>INFORMATION</option>
                 <option>IMPORTANT</option>
                 <option>URGENT</option>
@@ -1473,9 +1595,30 @@ function Announcements() {
           </div>
           <label>
             Expires at
-            <input type="datetime-local" name="expires" required />
+            <input
+              type="datetime-local"
+              name="expires"
+              required
+              defaultValue={
+                editing
+                  ? new Date(
+                      new Date(editing.expires_at).getTime() -
+                        new Date(editing.expires_at).getTimezoneOffset() *
+                          60000,
+                    )
+                      .toISOString()
+                      .slice(0, 16)
+                  : ""
+              }
+            />
           </label>
-          <button className="primary">Publish announcement</button>
+          <button className="primary" disabled={saving}>
+            {saving
+              ? "Saving…"
+              : editing
+                ? "Save correction"
+                : "Publish announcement"}
+          </button>
         </form>
       )}
       {data?.items.length ? (
@@ -1488,6 +1631,50 @@ function Announcements() {
               {a.issuer} · {new Date(a.created_at).toLocaleString()} · Expires{" "}
               {new Date(a.expires_at).toLocaleString()}
             </small>
+            {canEdit(a) && (
+              <div className="button-row">
+                <button
+                  onClick={() => {
+                    setEditing(a);
+                    setCreate(true);
+                  }}
+                >
+                  Correct notice
+                </button>
+                <button
+                  disabled={saving}
+                  onClick={async () => {
+                    if (
+                      !window.confirm(
+                        "Withdraw this notice from the active announcements? Its audit history will be retained.",
+                      )
+                    )
+                      return;
+                    setSaving(true);
+                    try {
+                      await api(`/announcements/${a.id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({
+                          title: a.title,
+                          body: a.body,
+                          audience: a.audience,
+                          importance: a.importance,
+                          expiresAt: a.expires_at,
+                          cancelled: true,
+                        }),
+                      });
+                      await reload();
+                    } catch (e) {
+                      setActionError((e as Error).message);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  Withdraw notice
+                </button>
+              </div>
+            )}
           </article>
         ))
       ) : (
@@ -1639,7 +1826,8 @@ function Admin() {
     users = useData("/admin/users"),
     health = useData("/admin/health"),
     audit = useData("/admin/audit"),
-    policies = useData("/admin/policies");
+    policies = useData("/admin/policies"),
+    inviteTeams = useData("/teams");
   const [tab, setTab] = useState("Accounts"),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
@@ -1729,8 +1917,15 @@ function Admin() {
                 </select>
               </label>
               <label>
-                Team ID <span>(required for rescuers)</span>
-                <input name="teamId" />
+                Rescue team (required for rescuers)
+                <select name="teamId">
+                  <option value="">None — authority account</option>
+                  {inviteTeams.data?.items.map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
             <button className="primary">Send invitation</button>
@@ -1757,6 +1952,25 @@ function Admin() {
                       <Badge value={u.status} />
                     </td>
                     <td>
+                      {["AUTHORITY", "RESCUER"].includes(u.role) &&
+                        u.status === "ACTIVE" && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await post(
+                                  `/admin/users/${u.id}/resend-invitation`,
+                                );
+                                setMessage(
+                                  "Invitation resubmitted. Existing accepted accounts should use password recovery.",
+                                );
+                              } catch (e) {
+                                setError((e as Error).message);
+                              }
+                            }}
+                          >
+                            Resend invitation
+                          </button>
+                        )}
                       {u.role !== "ADMIN" && (
                         <button
                           onClick={async () => {
@@ -1789,7 +2003,10 @@ function Admin() {
         </>
       )}
       {tab === "Teams" && (
-        <AdminTeam catalog={catalog.data} onError={setError} />
+        <>
+          <AdminTeam catalog={catalog.data} onError={setError} />
+          <OrganizationTeams />
+        </>
       )}{" "}
       {tab === "Configuration" && (
         <div className="panel">
@@ -1836,8 +2053,18 @@ function Admin() {
           ))}
         </div>
       )}
-      {tab === "Configuration" && <ManagementPanels />}
-      {tab === "Accounts" && <AccountScopeForm />}
+      {tab === "Configuration" && (
+        <>
+          <ManagementPanels />
+          <ResourceLocationForm />
+        </>
+      )}
+      {tab === "Accounts" && (
+        <>
+          <AccountScopeForm />
+          <NotificationPreferences />
+        </>
+      )}
       {tab === "Audit" && (
         <div className="panel table-wrap">
           <table>
@@ -1864,6 +2091,7 @@ function Admin() {
           </table>
         </div>
       )}
+      {tab === "Health" && <NotificationJobs />}
       {tab === "Health" && (
         <div className="panel">
           <h2>Runtime integration status</h2>
@@ -1906,7 +2134,7 @@ function AdminTeam({
               .filter(Boolean),
           });
           setMsg(
-            `Team created: ${t.id}. Use this ID when provisioning members.`,
+            `Team created. Open Accounts to select it when inviting members. Reference: ${t.id}`,
           );
         } catch (e) {
           onError((e as Error).message);

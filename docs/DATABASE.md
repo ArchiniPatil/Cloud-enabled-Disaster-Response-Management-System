@@ -41,3 +41,7 @@ Team eligibility requires department match, configured capabilities with unexpir
 Assignments and resources lock their capacity row before allocating. Unique partial indexes prevent duplicate active assignments. Critical creation uses an actor-scoped idempotency key plus request hash; reusing a key for changed input returns conflict. Each status transition is validated and audited. Audit/status/revision records reject update/delete; the production runtime login also lacks those grants. Database owners are trusted operators and can administer schema; append-only tables are not cryptographic tamper proof.
 
 Location history defaults to 24 hours and is configurable from 1–168 hours. The worker deletes expired historical coordinates and clears old team coordinates. Incidents, session identifiers and evidence metadata have independent retention responsibilities described in operations. S3 evidence expires after 90 days; historical versions after 30 days. Do not assume regulatory retention compliance without a jurisdiction-specific policy.
+
+## Management and operational extensions
+
+Migration 005 adds organization activation and an idempotent SMS receipt ledger keyed by provider message ID/outcome; existing team qualifications retain nullable expiry times. Migration 006 adds optional indexed geography, address and private-by-default public listing to resources. A published resource must have a location. Receipt reconciliation relates provider IDs to notification attempts without storing destination phone numbers.

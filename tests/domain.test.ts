@@ -122,3 +122,19 @@ describe("zero-budget deployment policy", () => {
     expect(result.stderr).toContain("approved AWS budget is $0");
   });
 });
+
+it("blocks academic cloud provisioning until the specific credit-funded plan is approved", () => {
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/academic-cloud.mjs", "deploy"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        APPROVE_ACADEMIC_DEPLOYMENT: "REVIEWED_CREDIT_FUNDED_DEMO",
+      },
+    },
+  );
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("Deployment blocked");
+});

@@ -185,11 +185,21 @@ export const authRouter = Router();
 authRouter.get("/config", (_req, res) =>
   res.json({
     mode: config.AUTH_MODE,
+    realtime: config.REALTIME_TRANSPORT,
+    identityConfigured:
+      config.AUTH_MODE === "cognito" &&
+      !!config.COGNITO_DOMAIN &&
+      !!config.COGNITO_CLIENT_ID &&
+      !!config.COGNITO_POOL_ID,
     emergencyPhone: config.EMERGENCY_PHONE ?? null,
   }),
 );
-authRouter.get("/login", async (_req, res) => {
-  if (!config.COGNITO_DOMAIN || !config.COGNITO_CLIENT_ID)
+authRouter.get(["/login", "/register", "/recover"], async (req, res) => {
+  if (
+    config.AUTH_MODE !== "cognito" ||
+    !config.COGNITO_DOMAIN ||
+    !config.COGNITO_CLIENT_ID
+  )
     fail(503, "IDENTITY_UNCONFIGURED", "Cognito has not been configured");
   const state = random(),
     verifier = random();
@@ -198,7 +208,13 @@ authRouter.get("/login", async (_req, res) => {
     [hash(state), verifier],
   );
   res.cookie("oauth_state", state, { ...cookie, maxAge: 600000 });
-  const url = new URL(`${config.COGNITO_DOMAIN}/oauth2/authorize`);
+  const destination =
+    req.path === "/register"
+      ? "/signup"
+      : req.path === "/recover"
+        ? "/forgotPassword"
+        : "/oauth2/authorize";
+  const url = new URL(`${config.COGNITO_DOMAIN}${destination}`);
   url.search = new URLSearchParams({
     response_type: "code",
     client_id: config.COGNITO_CLIENT_ID!,
@@ -242,6 +258,7 @@ authRouter.get("/callback", async (req, res) => {
     algorithms: ["RS256"],
   });
   if (
+    identity.payload.token_use !== "id" ||
     identity.payload.sub !== claims.sub ||
     identity.payload.email_verified !== true
   )
@@ -255,7 +272,7 @@ authRouter.get("/callback", async (req, res) => {
     if (existing) return existing;
     return (
       await db.query(
-        "INSERT INTO user_profiles(cognito_sub,email,name,role) VALUES($1,$2,$3,'CITIZEN') RETURNING *",
+        "INSERT INTO user_profiles(cognito_sub,email,name,role) VALUES($1,$2,$3,'CITIZEN') ON CONFLICT(cognito_sub) DO UPDATE SET cognito_sub=excluded.cognito_sub RETURNING *",
         [
           claims.sub,
           identity.payload.email,

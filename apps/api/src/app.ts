@@ -9,6 +9,7 @@ import { pool, transaction } from "./db.js";
 import { authRouter, authenticate, csrf } from "./auth.js";
 import { incidentRouter, assignmentsRouter } from "./incidents.js";
 import { operations } from "./operations.js";
+import { metrics } from "./metrics.js";
 import { locationsRouter } from "./locations.js";
 import { evidenceRouter } from "./evidence.js";
 import { incidentAccess } from "./policy.js";
@@ -128,6 +129,7 @@ app.use("/api/v1/assignments", assignmentsRouter);
 app.use("/api/v1/locations", locationsRouter);
 app.use("/api/v1/evidence", evidenceRouter);
 app.use("/api/v1", operations);
+app.use("/api/v1", metrics);
 app.use((_req, res) =>
   res
     .status(404)

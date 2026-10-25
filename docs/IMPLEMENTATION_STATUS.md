@@ -1,8 +1,8 @@
 # Implementation status
 
-Updated 24 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
+Updated 25 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
 
-**Current user constraints:** $0 AWS budget; no custom domain. Local evaluation is the selected target. Paid AWS provisioning is disabled in `config/deployment-policy.json`, with a tested guard before AWS calls. Free Tier is not treated as a zero-cost guarantee.
+**Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; provisioning remains disabled pending account verification and approval of that plan. Both deployment guards refuse unapproved provisioning.
 
 ## Completed implementation
 
@@ -29,8 +29,8 @@ Updated 24 October 2026. The repository was initially empty. **The core applicat
 | Check | Result | Scope |
 |---|---|---|
 | TypeScript, ESLint, production build | Passed | Local source and frontend/API bundles |
-| Unit + integration suite | 31 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
-| Playwright browser suite | 3 scenarios passed | Citizen→authority→responder lifecycle, mobile persistence/GPS/layout, admin forms |
+| Unit + integration suite | 40 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
+| Playwright browser suite | 4 scenarios passed with SSE and polling | Citizen→authority→responder lifecycle, mobile persistence/GPS/layout, admin forms, organization/announcement/metrics workflows |
 | Docker image build + smoke | Passed | Node 22 container, health/readiness, cookie identity, database-backed scoped request |
 | CDK synthesis and security assertions | Passed | Local CloudFormation structure; no account API deployment |
 | Pipeline + analytics variant synthesis | Passed | Optional resources included, not provisioned |
@@ -43,17 +43,28 @@ See `TESTING.md` for commands and precise test boundaries. Test outcomes above d
 
 ## External prerequisites
 
-- Secure AWS role/profile configuration; a successful read-only STS check; a reviewed nonzero budget and explicit approval if the user later opts into the paid reference stack. No domain is required for current local evaluation.
+- Secure AWS role/profile configuration; a successful read-only STS check; a reviewed credit allowance/window with explicit approval for the academic plan, or a separately approved cash budget for the paid reference stack. No domain is required for current local evaluation.
 - Current regional price/quota/service verification and explicit approval before provisioning. Current pricing/documentation requests were network-denied; planning cost ranges are unverified allowances.
 - Live Cognito managed registration/MFA/recovery/refresh/revocation tests, RDS restore drill, S3 IAM/finalization tests, real queue/Lambda/Scheduler behavior and Location routes/maps.
 - India/recipient-country SMS sender/template registration, verified test numbers, spend cap and approved IAM before SMS activation. No real SMS has been sent.
 - Amplify source/manual publication, DNS/certificate setup, same-origin cookie/SSE proxy validation. Source code has been published to the authorized GitHub repository; this does not deploy the application.
 
-## Deliberate limits / incomplete advanced work
+## Added academic demonstration capabilities
 
-- SMS delivery-receipt ingestion is not implemented; only provider acceptance/failure/uncertainty is recorded. Browser push is not implemented; in-app notices and authenticated SSE are available.
-- Analytics exports category/severity/status counts and aggregate age. A complete response-time, team/resource utilization BI suite is not implemented.
-- Some management operations (announcement correction/cancellation, advanced team certification expiry and organization lifecycle) are API/database-model capabilities or require further administration UI work. A map-pin editor/address search and shelter map are not implemented; validated manual coordinates are supported.
+- Separate Cognito login, citizen registration and password-recovery links; pending invitation resend; real-account local startup with an isolated unseeded database and controlled first-admin bootstrap.
+- Organization activation, team membership display, capacity/vehicle/capability editing with qualification expiry and active-assignment guards; notification preferences and attempt/retry UI.
+- Announcement correction and withdrawal; bounded authorized response-time, escalation, team and inventory metrics.
+- Authenticated address search and map-pin correction; administrator-published shelter/resource locations with private-by-default scope rules.
+- Idempotent SNS delivery-receipt ingestion through optional allowlisted CloudWatch subscriptions; no phone/raw provider payload persistence.
+- Encrypted incident, team and resource aggregate exports and three Glue/Athena tables.
+- Domain-free academic AWS template: Amplify default hostname, API Gateway HTTPS, VPC Link to an internal ALB, private ECS/RDS; tested authenticated polling as an alternative to SSE.
+- Identity-only CDK template and PowerShell-compatible setup/preflight/deployment helpers; no AWS account upgrade or automatic provisioning.
+
+## Remaining external acceptance and operational limits
+
+- SMS receipt ingestion is implemented and locally tested; live SNS logging/subscriptions, sandbox destinations and sender/template registration remain unconfigured. Browser push is optional and not implemented; in-app notices and authorized SSE/polling are available.
+- Analytics exports and operational metrics are implemented. Live S3 exports and Athena queries remain unverified; no external BI dashboard is configured.
+- Real Cognito enrollment/invitations/MFA/recovery, email delivery, S3 uploads, Location map/search/routes and hosted proxy/cookie behavior require actual provider configuration and live acceptance tests. A provider identity created immediately before a database failure requires operator reconciliation; no cross-service transaction is claimed.
 - No independent penetration testing, sustained load/chaos testing, verified AWS disaster recovery, malware/EXIF scanning, legal retention review or operational field validation.
 - CDK synthesis cannot prove account-specific IAM, quotas, regional data-provider support, successful migrations on RDS, or cloud transport behavior. These remain explicit deployment acceptance gates.
 

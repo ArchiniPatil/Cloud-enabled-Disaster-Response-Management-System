@@ -3,6 +3,310 @@ import { api, post, label } from "./api";
 import { useData } from "./hooks";
 
 type Option = { id: string; name: string };
+export function ResourceLocationForm() {
+  const resources = useData("/resources");
+  return (
+    <ManagedForm
+      title="Resource location"
+      submit={async (f) => {
+        await api(`/admin/resources/${f.get("id")}/location`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            latitude:
+              f.get("latitude") === "" ? null : Number(f.get("latitude")),
+            longitude:
+              f.get("longitude") === "" ? null : Number(f.get("longitude")),
+            address: f.get("address"),
+            publiclyListed: f.get("publiclyListed") === "on",
+          }),
+        });
+      }}
+    >
+      <Options
+        title="Resource or shelter inventory"
+        name="id"
+        items={resources.data?.items}
+      />
+      <div className="two-columns">
+        <label>
+          Resource latitude
+          <input name="latitude" type="number" step="any" min={-90} max={90} />
+        </label>
+        <label>
+          Resource longitude
+          <input
+            name="longitude"
+            type="number"
+            step="any"
+            min={-180}
+            max={180}
+          />
+        </label>
+      </div>
+      <label>
+        Site address
+        <input name="address" maxLength={300} />
+      </label>
+      <label className="checkbox-label">
+        <input name="publiclyListed" type="checkbox" />
+        Publish this location for citizens
+      </label>
+      <p>
+        Use verified sites only. Leaving both coordinates blank removes the
+        location. Unpublished locations remain restricted by department,
+        jurisdiction and team.
+      </p>
+    </ManagedForm>
+  );
+}
+export function NotificationJobs() {
+  const { data, error, reload } = useData("/admin/notification-jobs");
+  const [failure, setFailure] = useState("");
+  return (
+    <section className="panel">
+      <h2>Notification attempts</h2>
+      <p>
+        Delivery does not imply acknowledgement or dispatch. Unknown submissions
+        cannot be retried automatically.
+      </p>
+      <button onClick={() => void reload()}>Refresh attempts</button>
+      {(error || failure) && <p role="alert">{error || failure}</p>}
+      {data?.items.map((j: any) => (
+        <details key={j.id}>
+          <summary>
+            {label(j.channel)} · {label(j.status)} ·{" "}
+            {new Date(j.created_at).toLocaleString()}
+          </summary>
+          {j.attempts.map((a: any, i: number) => (
+            <p key={i}>
+              {label(a.outcome)} · {new Date(a.at).toLocaleString()}
+            </p>
+          ))}
+          {j.status === "FAILED" && (
+            <button
+              onClick={async () => {
+                try {
+                  await post(`/admin/notifications/${j.id}/retry`);
+                  await reload();
+                } catch (e) {
+                  setFailure((e as Error).message);
+                }
+              }}
+            >
+              Retry failed notification
+            </button>
+          )}
+        </details>
+      ))}
+    </section>
+  );
+}
+export function OrganizationTeams() {
+  const organizations = useData("/admin/organizations"),
+    teams = useData("/admin/team-details");
+  const [selected, setSelected] = useState("");
+  const team = teams.data?.items.find((t: any) => t.id === selected);
+  return (
+    <section>
+      <p role="alert">{organizations.error || teams.error}</p>
+      <ManagedForm
+        title="Organization"
+        submit={async (f) => {
+          await post("/admin/organizations", { name: f.get("name") });
+          await organizations.reload();
+        }}
+      >
+        <label>
+          Organization name
+          <input name="name" required minLength={2} maxLength={100} />
+        </label>
+      </ManagedForm>
+      {organizations.data?.items.map((o: any) => (
+        <ManagedForm
+          key={o.id}
+          title={`Organization: ${o.name}`}
+          submit={async (f) => {
+            await api(`/admin/organizations/${o.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                name: f.get("name"),
+                active: f.get("active") === "on",
+              }),
+            });
+            await organizations.reload();
+            await teams.reload();
+          }}
+        >
+          <label>
+            Name
+            <input
+              name="name"
+              defaultValue={o.name}
+              required
+              minLength={2}
+              maxLength={100}
+            />
+          </label>
+          <label className="checkbox-label">
+            <input name="active" type="checkbox" defaultChecked={o.active} />
+            Active organization
+          </label>
+          <p>
+            {o.team_count} teams. Deactivation stops location sharing and is
+            blocked while assignments remain active.
+          </p>
+        </ManagedForm>
+      ))}
+      <div className="panel">
+        <h2>Team configuration and certifications</h2>
+        <label>
+          Choose a team
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">Select…</option>
+            {teams.data?.items.map((t: any) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {team && (
+          <ManagedForm
+            key={team.id}
+            title="Team configuration"
+            submit={async (f) => {
+              const capabilities = String(f.get("capabilities"))
+                .split("\n")
+                .map((v) => v.trim())
+                .filter(Boolean)
+                .map((line) => {
+                  const [capability, date] = line
+                    .split("|")
+                    .map((v) => v.trim());
+                  return {
+                    capability,
+                    expiresAt: date
+                      ? new Date(`${date}T23:59:59Z`).toISOString()
+                      : null,
+                  };
+                });
+              await api(`/admin/teams/${team.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                  name: f.get("name"),
+                  organizationId: f.get("organizationId") || null,
+                  vehicle: f.get("vehicle"),
+                  capacity: Number(f.get("capacity")),
+                  capabilities,
+                }),
+              });
+              await teams.reload();
+            }}
+          >
+            <label>
+              Team name
+              <input name="name" defaultValue={team.name} required />
+            </label>
+            <Options
+              name="organizationId"
+              title="Organization"
+              optional
+              items={organizations.data?.items.filter((o: any) => o.active)}
+              defaultValue={team.organization_id ?? ""}
+            />
+            <label>
+              Vehicle
+              <input name="vehicle" defaultValue={team.vehicle ?? ""} />
+            </label>
+            <label>
+              Concurrent assignments
+              <input
+                name="capacity"
+                type="number"
+                min={1}
+                max={5}
+                defaultValue={team.capacity}
+              />
+            </label>
+            <label>
+              Capabilities and expiry dates
+              <textarea
+                name="capabilities"
+                defaultValue={team.capabilities
+                  .map(
+                    (c: any) =>
+                      `${c.capability}${c.expiresAt ? " | " + c.expiresAt.slice(0, 10) : ""}`,
+                  )
+                  .join("\n")}
+              />
+            </label>
+            <p>
+              One per line, for example FIRST_AID | 2027-06-30. Leave the date
+              off for a capability without expiry. Expired qualifications
+              prevent matching. Finish or cancel active assignments before
+              editing.
+            </p>
+            <h3>Members</h3>
+            {team.members.length ? (
+              team.members.map((m: any) => (
+                <p key={m.id}>
+                  {m.name} · {label(m.status)}
+                </p>
+              ))
+            ) : (
+              <p>No members. Invite a rescuer from Accounts.</p>
+            )}
+          </ManagedForm>
+        )}
+      </div>
+    </section>
+  );
+}
+export function NotificationPreferences() {
+  const users = useData("/admin/notification-config");
+  return (
+    <ManagedForm
+      title="Notification recipient"
+      submit={async (f) => {
+        await api(`/admin/users/${f.get("id")}/notification-preferences`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            phone: f.get("phone") || null,
+            smsEnabled: f.get("smsEnabled") === "on",
+          }),
+        });
+        await users.reload();
+      }}
+    >
+      <Options
+        name="id"
+        title="Operational account"
+        items={users.data?.recipients}
+      />
+      <label>
+        Approved test phone number
+        <input
+          name="phone"
+          type="tel"
+          placeholder="+countrycode…"
+          pattern="\+[1-9][0-9]{7,14}"
+        />
+      </label>
+      <label className="checkbox-label">
+        <input name="smsEnabled" type="checkbox" />
+        Opt in to operational SMS
+      </label>
+      <p>
+        This replaces the recipient's phone preference. Sending remains disabled
+        until the deployment-wide SMS setting and AWS sandbox destination
+        approval are configured. In-app notifications work independently.
+      </p>
+    </ManagedForm>
+  );
+}
 function Options({
   name,
   title,

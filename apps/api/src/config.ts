@@ -4,6 +4,8 @@ const schema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   AUTH_MODE: z.enum(["cognito", "demo"]).default("cognito"),
+  EVENT_TRANSPORT: z.enum(["aws", "database"]).optional(),
+  REALTIME_TRANSPORT: z.enum(["sse", "poll"]).default("sse"),
   DATABASE_URL: z.string().optional(),
   DATABASE_SECRET_ARN: z.string().optional(),
   AWS_REGION: z.string().default("ap-south-1"),
@@ -18,6 +20,7 @@ const schema = z.object({
   EVIDENCE_BUCKET: z.string().optional(),
   EVENT_TOPIC_ARN: z.string().optional(),
   LOCATION_MAP_NAME: z.string().optional(),
+  LOCATION_PLACE_INDEX: z.string().optional(),
   LOCATION_ROUTE_CALCULATOR: z.string().optional(),
   ANALYTICS_BUCKET: z.string().optional(),
   SMS_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -25,6 +28,16 @@ const schema = z.object({
   EMERGENCY_PHONE: z.string().optional(),
 });
 export const config = schema.parse(process.env);
+if (
+  config.EVENT_TRANSPORT === "database" &&
+  (config.NODE_ENV === "production" ||
+    config.DATABASE_SECRET_ARN ||
+    !config.DATABASE_URL ||
+    !["localhost", "127.0.0.1"].includes(new URL(config.DATABASE_URL).hostname))
+)
+  throw new Error(
+    "Database event transport is restricted to a local development database",
+  );
 if (
   config.NODE_ENV === "production" &&
   (config.AUTH_MODE === "demo" ||
@@ -57,6 +70,7 @@ if (
     config.EVENT_TOPIC_ARN ||
     config.EVIDENCE_BUCKET ||
     config.LOCATION_MAP_NAME ||
+    config.LOCATION_PLACE_INDEX ||
     config.LOCATION_ROUTE_CALCULATOR ||
     config.ANALYTICS_BUCKET)
 ) {

@@ -21,6 +21,14 @@ The frontend listens on port **5173**, API on **4000**, and loopback-only PostGI
 
 The startup command loads the ignored `.env`. For production, set `AUTH_MODE=cognito` and provide the CDK environment configuration. No production password is stored in PostgreSQL application tables.
 
+## Updating an existing local installation
+
+Stop the development terminal with Ctrl+C. Replace the project source files with the new ZIP contents while keeping your existing `.env` and project-folder name. Do not delete Docker volumes. Run `npm run setup:local` to install the locked dependencies and apply additive migrations, then `npm run dev:local`.
+
+## Academic demonstration with real logins and AWS
+
+See [the academic demonstration guide](docs/ACADEMIC_DEMO.md) for the isolated Cognito login option, domain-free hosted architecture, reported $120-credit constraint, proposed cost/window review, first administrator, invitations, frontend publication and cleanup. Run `npm run aws:preflight` for read-only identity checks on the laptop where AWS credentials are configured; `npm run cloud:plan` only synthesizes the proposed stack. No AWS services have been provisioned.
+
 ## Demonstrate the complete workflow
 
 1. Open three independent browser profiles for citizen, authority, and rescuer.

@@ -3278,6 +3278,470 @@
           }
         ]
       }
+    },
+    "/auth/register": {
+      "get": {
+        "summary": "Cognito citizen registration",
+        "operationId": "get_auth_register",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "302": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/auth/recover": {
+      "get": {
+        "summary": "Cognito password recovery",
+        "operationId": "get_auth_recover",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "302": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [],
+        "security": []
+      }
+    },
+    "/metrics/operations": {
+      "get": {
+        "summary": "Scoped operational metrics",
+        "operationId": "get_metrics_operations",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            }
+          }
+        ]
+      }
+    },
+    "/locations/search": {
+      "get": {
+        "summary": "Authenticated address search",
+        "operationId": "get_locations_search",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 200
+            }
+          }
+        ]
+      }
+    },
+    "/resource-locations": {
+      "get": {
+        "summary": "Authorized shelter and resource sites",
+        "operationId": "get_resource_locations",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/organizations": {
+      "get": {
+        "summary": "List organizations",
+        "operationId": "get_admin_organizations",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": []
+      },
+      "post": {
+        "summary": "Create organization",
+        "operationId": "post_admin_organizations",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "201": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/organizations/{id}": {
+      "patch": {
+        "summary": "Update organization lifecycle",
+        "operationId": "patch_admin_organizations_id",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/team-details": {
+      "get": {
+        "summary": "Team members and expiring qualifications",
+        "operationId": "get_admin_team_details",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/teams/{id}": {
+      "patch": {
+        "summary": "Update an idle team configuration",
+        "operationId": "patch_admin_teams_id",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/users/{id}/resend-invitation": {
+      "post": {
+        "summary": "Resend a pending Cognito invitation",
+        "operationId": "post_admin_users_id_resend_invitation",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/users/{id}/notification-preferences": {
+      "patch": {
+        "summary": "Set operational SMS opt-in and test destination",
+        "operationId": "patch_admin_users_id_notification_preferences",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/notification-jobs": {
+      "get": {
+        "summary": "List notification outcomes and attempts",
+        "operationId": "get_admin_notification_jobs",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/admin/resources/{id}/location": {
+      "patch": {
+        "summary": "Set authorized or published resource location",
+        "operationId": "patch_admin_resources_id_location",
+        "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
+        "responses": {
+          "200": {
+            "description": "Redirect or successful authorized operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Role, origin or CSRF rejected"
+          },
+          "409": {
+            "description": "State conflict"
+          },
+          "503": {
+            "description": "Provider not configured"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

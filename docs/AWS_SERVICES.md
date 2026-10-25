@@ -32,3 +32,7 @@ Every resource below is **defined but not provisioned** unless explicitly marked
 6. Enable `SMS_ENABLED=true` only after approval and verified recipient configuration. Unknown outcomes are not automatically resent; reconcile them first. Definite failures can be retried explicitly, with a three-attempt cap and per-recipient rate cap.
 
 Official references: [SNS SMS](https://docs.aws.amazon.com/sns/latest/dg/sns-mobile-phone-number-as-subscriber.html), [India registration](https://docs.aws.amazon.com/sms-voice/latest/userguide/registrations-sms-senderid-india.html), [Amazon Location](https://docs.aws.amazon.com/location/latest/developerguide/what-is.html). Access to current documentation/pricing was network-denied during this session; requirements must be reconfirmed before provisioning or sending.
+
+## Academic variants
+
+The default-hostname academic template adds API Gateway HTTP API and VPC Link to the private ALB and uses Amplify's default hostname. Amazon Location includes an authenticated place-index search proxy as well as maps/routes. Optional CloudWatch SNS delivery subscriptions invoke a dedicated receipt Lambda. Glue/Athena describe incident, team and resource aggregate datasets. A separate identity-only template uses Cognito Lite with email/TOTP and no SMS. These are synthesized definitions; none has been provisioned or live-validated.
