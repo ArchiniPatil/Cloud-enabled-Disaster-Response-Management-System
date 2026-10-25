@@ -94,3 +94,7 @@ The deploy script requires approved HTTPS domain configuration, an existing ACM 
 - `scripts`: setup, migrations, controlled admin bootstrap, deployment and cleanup.
 
 See [implementation status](docs/IMPLEMENTATION_STATUS.md) for exact tested, unverified and incomplete capabilities; [API](docs/API.md), [architecture](docs/ARCHITECTURE.md), [database](docs/DATABASE.md), [workflows](docs/USER_WORKFLOWS.md), [AWS services](docs/AWS_SERVICES.md), [testing](docs/TESTING.md), and [operations](docs/OPERATIONS.md) for details.
+
+## Operational interface update
+
+See the [completion report](docs/REDESIGN_REPORT.md) for role dashboards, priority queues, reporting and outcome records, authentication fixes, notification simulation and validation results. Start in VS Code with [START_HERE.md](START_HERE.md); deploy using the [PowerShell AWS guide](docs/AWS_WINDOWS_DEPLOYMENT.md). Local fixtures are explicitly accessed through Development / Demo Mode, never through production sign-in.

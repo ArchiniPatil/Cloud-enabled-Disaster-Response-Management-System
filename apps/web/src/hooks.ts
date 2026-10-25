@@ -1,19 +1,34 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { api } from "./api";
-export function useData<T = any>(path: string) {
+export function useData<T = any>(path: string, pollMs = 0) {
   const [data, setData] = useState<T | null>(null),
     [error, setError] = useState("");
+  const sequence = useRef(0);
   const reload = useCallback(async () => {
+    const request = ++sequence.current;
     try {
-      setData(await api(path));
-      setError("");
+      const result = await api<T>(path);
+      if (request === sequence.current) {
+        setData(result);
+        setError("");
+      }
     } catch (e) {
-      setError((e as Error).message);
+      if (request === sequence.current) setError((e as Error).message);
     }
   }, [path]);
   useEffect(() => {
     setData(null);
+    setError("");
     void reload();
-  }, [reload]);
+    const timer = pollMs
+      ? window.setInterval(() => {
+          if (document.visibilityState === "visible") void reload();
+        }, pollMs)
+      : undefined;
+    return () => {
+      ++sequence.current;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [reload, pollMs]);
   return { data, error, reload };
 }

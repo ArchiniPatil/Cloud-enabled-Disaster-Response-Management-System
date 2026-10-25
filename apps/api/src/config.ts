@@ -23,6 +23,14 @@ const schema = z.object({
   LOCATION_PLACE_INDEX: z.string().optional(),
   LOCATION_ROUTE_CALCULATOR: z.string().optional(),
   ANALYTICS_BUCKET: z.string().optional(),
+  NOTIFICATION_TRANSPORT: z
+    .enum(["aws", "simulator"])
+    .default(
+      process.env.AUTH_MODE === "demo" && process.env.NODE_ENV !== "test"
+        ? "simulator"
+        : "aws",
+    ),
+  EMAIL_FROM: z.string().email().optional(),
   SMS_ENABLED: z.enum(["true", "false"]).default("false"),
   LOCATION_RETENTION_HOURS: z.coerce.number().int().min(1).max(168).default(24),
   EMERGENCY_PHONE: z.string().optional(),
@@ -67,6 +75,7 @@ if (
 if (
   config.AUTH_MODE === "demo" &&
   (config.SMS_ENABLED === "true" ||
+    config.EMAIL_FROM ||
     config.EVENT_TOPIC_ARN ||
     config.EVIDENCE_BUCKET ||
     config.LOCATION_MAP_NAME ||
@@ -78,3 +87,11 @@ if (
     "Local demo mode cannot enable billable AWS integrations. Use the reviewed Cognito deployment configuration for cloud integration tests.",
   );
 }
+
+if (
+  config.NOTIFICATION_TRANSPORT === "simulator" &&
+  (config.NODE_ENV === "production" || config.AUTH_MODE !== "demo")
+)
+  throw new Error(
+    "Notification simulator is restricted to explicit local demo mode",
+  );

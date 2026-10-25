@@ -63,6 +63,11 @@ if (mode === "inventory") {
     "--output",
     "cdk.out/academic",
   ];
+  if (process.env.AWS_EMAIL_FROM) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(process.env.AWS_EMAIL_FROM))
+      throw new Error("AWS_EMAIL_FROM must be a verified SES email identity");
+    args.push("-c", `emailFrom=${process.env.AWS_EMAIL_FROM}`);
+  }
   if (process.env.AWS_GIT_CONNECTION_ARN) {
     if (
       !/^arn:aws:(?:codeconnections|codestar-connections):[a-z0-9-]+:[0-9]{12}:connection\/[a-zA-Z0-9-]+$/.test(

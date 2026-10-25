@@ -71,7 +71,7 @@ operations.get(
     res.json({
       items: (
         await pool.query(
-          `SELECT t.id,t.name,t.department_id,t.jurisdiction_id,t.availability,t.capacity,t.vehicle,d.name department,ARRAY(SELECT capability FROM team_capabilities WHERE team_id=t.id) capabilities FROM rescue_teams t JOIN departments d ON d.id=t.department_id WHERE ($1='ADMIN' OR ($1='AUTHORITY' AND t.department_id=$2 AND t.jurisdiction_id=$3) OR ($1='RESCUER' AND EXISTS(SELECT 1 FROM team_memberships WHERE team_id=t.id AND user_id=$4))) ORDER BY t.name LIMIT 100`,
+          `SELECT t.id,t.name,t.department_id,t.jurisdiction_id,t.availability,t.capacity,t.vehicle,(SELECT count(*)::int FROM team_memberships m JOIN user_profiles u ON u.id=m.user_id WHERE m.team_id=t.id AND u.status='ACTIVE') active_members,(SELECT count(*)::int FROM incident_assignments a WHERE a.team_id=t.id AND a.status NOT IN('COMPLETED','DECLINED','CANCELLED')) active_assignments,d.name department,ARRAY(SELECT capability FROM team_capabilities WHERE team_id=t.id) capabilities FROM rescue_teams t JOIN departments d ON d.id=t.department_id WHERE ($1='ADMIN' OR ($1='AUTHORITY' AND t.department_id=$2 AND t.jurisdiction_id=$3) OR ($1='RESCUER' AND EXISTS(SELECT 1 FROM team_memberships WHERE team_id=t.id AND user_id=$4))) ORDER BY t.name LIMIT 100`,
           [
             req.user.role,
             req.user.department_id,
@@ -261,10 +261,19 @@ operations.patch(
 );
 operations.get("/notifications", async (req, res) =>
   res.json({
+    unread: (
+      await pool.query(
+        "SELECT count(*)::int count FROM notification_jobs WHERE recipient_id=$1 AND read_at IS NULL",
+        [req.user.id],
+      )
+    ).rows[0].count,
     items: (
       await pool.query(
-        "SELECT id,incident_id,channel,status,read_at,created_at FROM notification_jobs WHERE recipient_id=$1 ORDER BY created_at DESC LIMIT 50",
-        [req.user.id],
+        `SELECT n.id,n.incident_id,n.channel,n.status,n.read_at,n.created_at,
+          CASE WHEN position('eligible:' in n.dedupe_key)>0 THEN 'ELIGIBILITY_ALERT' WHEN position('assignment:' in n.dedupe_key)>0 THEN 'ASSIGNMENT_OFFER' WHEN position('citizen-status:' in n.dedupe_key)>0 THEN 'STATUS_UPDATE' ELSE 'COORDINATION_UPDATE' END type,
+          EXISTS(SELECT 1 FROM incidents i WHERE i.id=n.incident_id AND ${scopeSQL}) can_open,
+          coalesce((SELECT json_agg(json_build_object('outcome',a.outcome,'at',a.created_at,'error',a.error_code) ORDER BY a.created_at) FROM notification_attempts a WHERE a.job_id=n.id),'[]') attempts FROM notification_jobs n WHERE recipient_id=$1 ORDER BY created_at DESC LIMIT 50`,
+        scopeParams(req.user),
       )
     ).rows,
   }),
@@ -781,6 +790,24 @@ operations.get("/admin/health", async (_req, res) =>
     smsEnabled: config.SMS_ENABLED === "true",
     evidenceConfigured: !!config.EVIDENCE_BUCKET,
     mapsConfigured: !!config.LOCATION_MAP_NAME,
+    notificationTransport:
+      config.NOTIFICATION_TRANSPORT === "simulator"
+        ? "Test mode — no external delivery"
+        : "AWS (configuration only; delivery checked per attempt)",
+    emailConfigured: !!config.EMAIL_FROM,
+    authentication:
+      config.AUTH_MODE === "demo"
+        ? "Test mode"
+        : config.COGNITO_POOL_ID
+          ? "Configured — provider sign-in required"
+          : "Not configured",
+    database: "Connected",
+    worker:
+      (
+        await pool.query(
+          "SELECT last_seen FROM runtime_heartbeats WHERE name='worker'",
+        )
+      ).rows[0]?.last_seen ?? "No heartbeat recorded",
   }),
 );
 operations.post("/admin/resources", async (req, res) => {

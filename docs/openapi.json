@@ -457,7 +457,101 @@
             "description": "Required service unconfigured or unavailable"
           }
         },
-        "parameters": []
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MODERATE",
+                "HIGH",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2160
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "unassigned",
+                "overdue"
+              ]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "priority",
+                "recent"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
       },
       "post": {
         "summary": "POST /incidents",
@@ -1211,7 +1305,30 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "Validated fields described in docs/API.md"
+                "additionalProperties": false,
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "DECLINED",
+                      "DISPATCHED",
+                      "EN_ROUTE",
+                      "ARRIVED",
+                      "IN_PROGRESS",
+                      "COMPLETED",
+                      "CANCELLED"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "description": "A note of at least five characters is required for DECLINED, CANCELLED and COMPLETED. Server state/role rules also apply."
               }
             }
           }
@@ -3641,7 +3758,7 @@
     },
     "/admin/users/{id}/notification-preferences": {
       "patch": {
-        "summary": "Set operational SMS opt-in and test destination",
+        "summary": "Set operational SMS/email opt-in and test destination",
         "operationId": "patch_admin_users_id_notification_preferences",
         "description": "See API.md for request fields, scope, provider prerequisites and state rules. Mutations require the session cookie, Origin and X-CSRF-Token.",
         "responses": {
@@ -3742,6 +3859,298 @@
           }
         ]
       }
+    },
+    "/incidents/summary": {
+      "get": {
+        "summary": "Scoped aggregate counts across all matching reports",
+        "operationId": "get_incidents_summary",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MODERATE",
+                "HIGH",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2160
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "unassigned",
+                "overdue"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/incidents/activity": {
+      "get": {
+        "summary": "Latest 12 authorized incident status events",
+        "operationId": "get_incidents_activity",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MODERATE",
+                "HIGH",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2160
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "unassigned",
+                "overdue"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/incidents/{id}/updates": {
+      "post": {
+        "summary": "Append immutable information to an open report",
+        "operationId": "post_incident_updates",
+        "responses": {
+          "200": {
+            "description": "Successful operation; see API.md"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Session required"
+          },
+          "403": {
+            "description": "Authorization or CSRF rejected"
+          },
+          "404": {
+            "description": "Not found or inaccessible"
+          },
+          "409": {
+            "description": "Invalid transition, idempotency or capacity conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "503": {
+            "description": "Required service unconfigured or unavailable"
+          },
+          "201": {
+            "description": "Created or idempotently returned existing result"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "body"
+                ],
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3798,6 +4207,20 @@
           "address": {
             "type": "string",
             "maxLength": 300
+          },
+          "peopleAffected": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "hazards": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "locationAccuracyM": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
           }
         }
       }

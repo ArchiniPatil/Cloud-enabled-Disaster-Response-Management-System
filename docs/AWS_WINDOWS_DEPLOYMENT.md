@@ -255,6 +255,25 @@ Use real account digits in the log names; the template validates them. Preserve 
 
 Browser push is not implemented. SNS SMS is not browser push. For a professor evaluation without approved SMS registration, demonstrate in-app notifications and real SNS/SQS events, and state the SMS boundary accurately.
 
+## Optional SES operational email
+
+Cognito identity emails and SNS alarm subscriptions are separate from incident emails. The incident worker can send SES email only after sender configuration and per-user opt-in. SES sender verification is not automated by this stack.
+
+1. In **Amazon SES → Verified identities**, use the same region as deployment (`ap-south-1`) and verify an email address you control. Confirm SES account/sandbox status and service eligibility. Sandbox sending requires verified test recipient identities too. Review actual usage prices and stay within the approved budget.
+2. Set the optional sender in your PowerShell session, preview and review the changed IAM/template:
+
+```powershell
+$env:AWS_EMAIL_FROM = 'your-verified-sender@example.com'
+npm run cloud:plan
+npx tsx scripts/verify-infra.ts cdk.out/academic/DisasterResponse-academic.template.json
+```
+
+3. Deploy using Step 5 with the same variable set. Keep it set for subsequent deployments. The template injects EMAIL_FROM and grants `ses:SendEmail` only to the worker for that exact email identity; it does not add a broad SES grant or deploy a verification resource.
+4. In Administration enable **email notifications** for a consenting authority/rescuer whose profile email is an eligible recipient. Trigger a clearly labelled test report in that account's scope and inspect the notification job/attempt and recipient inbox.
+5. Provider acceptance records **SUBMITTED**, not delivery. Definite failures can be retried within the three-attempt limit; ambiguous outcomes remain UNKNOWN for reconciliation. There is no SES bounce/delivery receipt consumer in this release. Do not interpret configured sender status as successful delivery.
+
+For a locally running real-Cognito application, configure `EMAIL_FROM` in the private `.env.cognito` and give its SDK identity the equivalent narrow SES permission. Do not set real sender configuration in `.env.demo`: the application rejects it. The local demo worker uses a sink explicitly labelled SIMULATED and does not contact SNS/SES.
+
 ## 12. Final acceptance sequence
 
 Use separate browser profiles and only test incidents/users. There are no pre-created authority/rescuer logins in a hosted deployment.

@@ -75,6 +75,7 @@ export function NotificationJobs() {
         <details key={j.id}>
           <summary>
             {label(j.channel)} · {label(j.status)} ·{" "}
+            {label(j.recipient_role ?? "")} ·{" "}
             {new Date(j.created_at).toLocaleString()}
           </summary>
           {j.attempts.map((a: any, i: number) => (
@@ -126,6 +127,14 @@ export function OrganizationTeams() {
           key={o.id}
           title={`Organization: ${o.name}`}
           submit={async (f) => {
+            if (
+              o.active &&
+              f.get("active") !== "on" &&
+              !window.confirm(
+                "Deactivate this organization and stop its location sharing?",
+              )
+            )
+              throw new Error("Change cancelled.");
             await api(`/admin/organizations/${o.id}`, {
               method: "PATCH",
               body: JSON.stringify({
@@ -276,6 +285,7 @@ export function NotificationPreferences() {
           body: JSON.stringify({
             phone: f.get("phone") || null,
             smsEnabled: f.get("smsEnabled") === "on",
+            emailEnabled: f.get("emailEnabled") === "on",
           }),
         });
         await users.reload();
@@ -298,6 +308,10 @@ export function NotificationPreferences() {
       <label className="checkbox-label">
         <input name="smsEnabled" type="checkbox" />
         Opt in to operational SMS
+      </label>
+      <label className="checkbox-label">
+        <input name="emailEnabled" type="checkbox" />
+        Opt in to operational email (verified SES sender required)
       </label>
       <p>
         This replaces the recipient's phone preference. Sending remains disabled
@@ -692,6 +706,12 @@ export function AccountScopeForm() {
           key={id}
           title="Account scope"
           submit={async (f) => {
+            if (
+              !window.confirm(
+                "Change this account's access and revoke its current sessions?",
+              )
+            )
+              throw new Error("Change cancelled.");
             await api(`/admin/users/${id}/organization`, {
               method: "PATCH",
               body: JSON.stringify({

@@ -68,6 +68,9 @@ export const incidentSchema = coordinateSchema
     kind: z.enum(["EMERGENCY", "REPORT"]),
     description: z.string().max(2000).default(""),
     address: z.string().max(300).default(""),
+    peopleAffected: z.number().int().min(1).max(1000000).optional(),
+    hazards: z.string().trim().max(1000).default(""),
+    locationAccuracyM: z.number().min(0).max(100000).optional(),
   })
   .strict();
 export function canTransition(from: Status, to: Status) {

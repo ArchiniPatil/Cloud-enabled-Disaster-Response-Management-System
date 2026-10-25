@@ -16,6 +16,12 @@ import {
   eligibleTeams,
   teamAccess,
 } from "./policy.js";
+import {
+  incidentQuery,
+  activeSQL,
+  assignedSQL,
+  overdueSQL,
+} from "./incident-query.js";
 export const incidentRouter = Router();
 const uuid = z.string().uuid();
 export async function recordTransition(
@@ -42,7 +48,11 @@ export async function recordTransition(
     `status:${id}:${crypto.randomUUID()}`,
   );
 }
-export async function notifyControl(db: DB, id: string, stage: number) {
+export async function notifyControl(
+  db: DB,
+  id: string,
+  stage: number | string,
+) {
   await db.query(
     `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key,status) SELECT i.id,u.id,'IN_APP',$2||':'||u.id,'AVAILABLE' FROM incidents i JOIN incident_departments d ON d.incident_id=i.id JOIN user_profiles u ON u.department_id=d.department_id AND u.role='AUTHORITY' AND u.status='ACTIVE' JOIN jurisdictions j ON j.id=u.jurisdiction_id WHERE i.id=$1 AND ST_Covers(j.boundary,i.location::geometry) ON CONFLICT(dedupe_key) DO NOTHING`,
     [id, `control:${id}:${stage}`],
@@ -84,12 +94,50 @@ export async function idempotent<T>(
   return result;
 }
 incidentRouter.get("/", async (req, res) => {
-  const p = page(req);
-  const rows = await pool.query(
-    `SELECT i.id,i.category,c.label,i.severity,i.status,i.kind,i.created_at,i.escalation_state FROM incidents i JOIN categories c ON c.code=i.category WHERE ${scopeSQL} ORDER BY i.created_at DESC LIMIT $5 OFFSET $6`,
-    [...scopeParams(req.user), p.limit, p.offset],
+  const p = page(req),
+    q = incidentQuery(req);
+  const [rows, total] = await Promise.all([
+    pool.query(
+      `SELECT i.id,i.category,c.label,i.severity,i.status,i.kind,i.created_at,i.escalation_state,i.address,
+      ST_Y(i.location::geometry) latitude,ST_X(i.location::geometry) longitude,
+      ${overdueSQL} overdue,
+      coalesce((SELECT json_agg(json_build_object('id',a.id,'name',t.name,'status',a.status)) FROM incident_assignments a JOIN rescue_teams t ON t.id=a.team_id WHERE a.incident_id=i.id AND a.status NOT IN('COMPLETED','DECLINED','CANCELLED')),'[]') assigned_teams
+      FROM incidents i JOIN categories c ON c.code=i.category WHERE ${q.where} ORDER BY ${q.sort} LIMIT $${q.params.length + 1} OFFSET $${q.params.length + 2}`,
+      [...q.params, p.limit, p.offset],
+    ),
+    pool.query(
+      `SELECT count(*)::int total FROM incidents i WHERE ${q.where}`,
+      q.params,
+    ),
+  ]);
+  res.json({
+    items: rows.rows,
+    total: total.rows[0].total,
+    ...p,
+    asOf: new Date().toISOString(),
+  });
+});
+incidentRouter.get("/summary", async (req, res) => {
+  const q = incidentQuery(req);
+  const result = await pool.query(
+    `SELECT count(*)::int total,
+    count(*) FILTER(WHERE ${activeSQL})::int active,
+    count(*) FILTER(WHERE ${activeSQL} AND i.severity='CRITICAL')::int critical,
+    count(*) FILTER(WHERE ${activeSQL} AND NOT ${assignedSQL})::int unassigned,
+    count(*) FILTER(WHERE ${activeSQL} AND i.severity='CRITICAL' AND NOT ${assignedSQL})::int critical_unassigned,
+    count(*) FILTER(WHERE ${overdueSQL})::int overdue,
+    count(*) FILTER(WHERE i.status='RESOLVED')::int resolved FROM incidents i WHERE ${q.where}`,
+    q.params,
   );
-  res.json({ items: rows.rows, ...p });
+  res.json({ ...result.rows[0], asOf: new Date().toISOString() });
+});
+incidentRouter.get("/activity", async (req, res) => {
+  const q = incidentQuery(req);
+  const result = await pool.query(
+    `SELECT h.id,h.incident_id,h.to_status,h.created_at,i.category FROM incident_status_history h JOIN incidents i ON i.id=h.incident_id WHERE ${q.where} ORDER BY h.created_at DESC,h.id DESC LIMIT 12`,
+    q.params,
+  );
+  res.json({ items: result.rows });
 });
 incidentRouter.post("/", requireRole("CITIZEN"), async (req, res) => {
   const input = incidentSchema.parse(req.body);
@@ -106,7 +154,7 @@ incidentRouter.post("/", requireRole("CITIZEN"), async (req, res) => {
         fail(400, "CATEGORY", "Unknown incident category");
       const i = (
         await db.query(
-          `INSERT INTO incidents(reporter_id,category,severity,kind,description,address,location,policy_id) VALUES($1,$2,$3,$4,$5,$6,ST_SetSRID(ST_MakePoint($7,$8),4326)::geography,(SELECT id FROM escalation_policies WHERE active ORDER BY name LIMIT 1)) RETURNING id,status`,
+          `INSERT INTO incidents(reporter_id,category,severity,kind,description,address,location,policy_id,people_affected,hazards,location_accuracy_m) VALUES($1,$2,$3,$4,$5,$6,ST_SetSRID(ST_MakePoint($7,$8),4326)::geography,(SELECT id FROM escalation_policies WHERE active ORDER BY name LIMIT 1),$9,$10,$11) RETURNING id,status`,
           [
             req.user.id,
             input.category,
@@ -116,6 +164,9 @@ incidentRouter.post("/", requireRole("CITIZEN"), async (req, res) => {
             input.address,
             input.longitude,
             input.latitude,
+            input.peopleAffected ?? null,
+            input.hazards,
+            input.locationAccuracyM ?? null,
           ],
         )
       ).rows[0];
@@ -170,10 +221,73 @@ incidentRouter.get("/:id", async (req, res) =>
           [i.id],
         )
       ).rows;
-      return { ...i, location: undefined, history, assignments, evidence };
+      const updates = (
+        await db.query(
+          "SELECT n.id,n.body,n.created_at,u.role actor_role FROM incident_updates n JOIN user_profiles u ON u.id=n.actor_id WHERE n.incident_id=$1 ORDER BY n.created_at",
+          [i.id],
+        )
+      ).rows;
+      return {
+        ...i,
+        location: undefined,
+        history,
+        assignments,
+        evidence,
+        updates,
+      };
     }),
   ),
 );
+incidentRouter.post("/:id/updates", async (req, res) => {
+  const { body } = z
+    .object({ body: z.string().trim().min(3).max(2000) })
+    .strict()
+    .parse(req.body);
+  const key = z.string().min(8).max(120).parse(req.get("idempotency-key"));
+  const result = await transaction(async (db) => {
+    const i = await incidentAccess(
+      db,
+      req.user,
+      uuid.parse(req.params.id),
+      true,
+    );
+    if (
+      ["RESOLVED", "CANCELLED", "DUPLICATE", "UNABLE_TO_RESPOND"].includes(
+        i.status,
+      )
+    )
+      fail(
+        409,
+        "CLOSED_REPORT",
+        "This report is closed; supplementary updates are unavailable",
+      );
+    return idempotent(
+      db,
+      req.user,
+      key,
+      { route: "incident-update", id: i.id, body },
+      async () => {
+        const row = (
+          await db.query(
+            "INSERT INTO incident_updates(incident_id,actor_id,body) VALUES($1,$2,$3) RETURNING id,created_at",
+            [i.id, req.user.id, body],
+          )
+        ).rows[0];
+        await audit(
+          db,
+          req.user.id,
+          "INCIDENT_UPDATE_ADDED",
+          "incident",
+          i.id,
+          { updateId: row.id },
+        );
+        await notifyControl(db, i.id, `update-${row.id}`);
+        return row;
+      },
+    );
+  });
+  res.status(201).json(result);
+});
 incidentRouter.post("/:id/status", async (req, res) => {
   const { status, note } = z
     .object({ status: z.enum(statuses), note: z.string().max(500).default("") })
@@ -211,6 +325,15 @@ incidentRouter.post("/:id/status", async (req, res) => {
           409,
           "INVALID_TRANSITION",
           `Cannot move from ${i.status} to ${status}`,
+        );
+      if (
+        ["RESOLVED", "UNABLE_TO_RESPOND"].includes(status) &&
+        note.trim().length < 5
+      )
+        fail(
+          400,
+          "OUTCOME_REQUIRED",
+          "Record the outcome and any remaining needs before closing the response",
         );
       if (
         ["RESOLVED", "CANCELLED", "DUPLICATE", "UNABLE_TO_RESPOND"].includes(
@@ -440,6 +563,7 @@ assignmentsRouter.post(
 assignmentsRouter.post("/:id/status", async (req, res) => {
   const b = z
     .object({
+      note: z.string().trim().max(1000).default(""),
       status: z.enum([
         "ACCEPTED",
         "DECLINED",
@@ -482,13 +606,23 @@ assignmentsRouter.post("/:id/status", async (req, res) => {
         await import("../../../packages/core/src/domain.js");
       if (!assignmentTransitions[a.status]?.includes(b.status))
         fail(409, "INVALID_TRANSITION", "Invalid assignment transition");
+      if (
+        ["DECLINED", "COMPLETED", "CANCELLED"].includes(b.status) &&
+        b.note.length < 5
+      )
+        fail(
+          400,
+          "OUTCOME_REQUIRED",
+          "Provide a reason or outcome of at least five characters",
+        );
       await db.query(
-        "UPDATE incident_assignments SET status=$2,updated_at=now() WHERE id=$1",
-        [id, b.status],
+        "UPDATE incident_assignments SET status=$2,outcome_note=$3,updated_at=now() WHERE id=$1",
+        [id, b.status, b.note],
       );
       await audit(db, req.user.id, "ASSIGNMENT_STATUS", "assignment", id, {
         from: a.status,
         to: b.status,
+        note: b.note,
       });
       const next: Record<string, string> = {
         DISPATCHED: "DISPATCHED",
@@ -510,7 +644,14 @@ assignmentsRouter.post("/:id/status", async (req, res) => {
         ).rowCount &&
         i.status === "TEAM_ON_SCENE"
       )
-        await recordTransition(db, i.id, i.status, "RESOLVED", req.user.id);
+        await recordTransition(
+          db,
+          i.id,
+          i.status,
+          "RESOLVED",
+          req.user.id,
+          b.note,
+        );
       if (["DECLINED", "CANCELLED"].includes(b.status)) {
         await db.query(
           "INSERT INTO escalation_executions(incident_id,stage,due_at,force_review) SELECT $1,coalesce(max(stage)+1,0),now(),true FROM escalation_executions WHERE incident_id=$1",

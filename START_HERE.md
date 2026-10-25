@@ -62,7 +62,7 @@ npm run setup:demo
 npm run dev:demo
 ```
 
-The labeled sample accounts are only for this fixture mode. Do not enable this mode on AWS. Stop the running app with Ctrl+C before switching modes; do not reuse an already running fixture server to evaluate real authentication.
+At the entry screen choose **Open Development / Demo Mode**, select a role and choose **Continue with local account**. No fixture password is required. The labeled sample accounts are only for this fixture mode. Do not enable this mode on AWS. Stop the running app with Ctrl+C before switching modes; do not reuse an already running fixture server to evaluate real authentication.
 
 ## 4. Use the four roles
 
@@ -104,6 +104,8 @@ VS Code **Terminal → Run Task** also provides setup, start, build, test, read-
 | `localhost` refused to connect | Start the correct development command and leave it running. Use port 5173, and read the terminal for the first error. |
 | Port 5173/4000/5432 already used | Stop the older project process/container. Do not delete database volumes to fix a port conflict. |
 | AWS explicit SCP deny | Resolve the organization policy with its administrator/AWS Support. Moving to your laptop does not override an account-level policy. |
+
+The [redesign completion report](docs/REDESIGN_REPORT.md) explains the new dashboards, login fixes, verified workflows and remaining integrations.
 
 ## Where everything is
 

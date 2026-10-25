@@ -16,6 +16,7 @@ import {
   Link,
   useNavigate,
   useParams,
+  useLocation,
 } from "react-router-dom";
 import {
   ShieldCheck,
@@ -36,13 +37,14 @@ import {
   ArrowLeft,
   Navigation,
   LogOut,
-  RefreshCw,
 } from "lucide-react";
 import type * as MapLibre from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { api, post, setCsrf, label } from "./api";
+import { api, post, setCsrf, label, ApiError } from "./api";
 import { etaLabel, locationState } from "../../../packages/core/src/domain";
 import "./styles.css";
+import "./operations.css";
+import { OperationalDashboard } from "./dashboard";
 import { OperationalMetrics } from "./metrics";
 import { ResourceMap } from "./resource-map";
 import { LocationPicker } from "./location-picker";
@@ -68,7 +70,7 @@ type User = {
 };
 const Session = createContext<{
   user: User | null;
-  refresh: () => Promise<void>;
+  refresh: (requireSession?: boolean) => Promise<void>;
   mode: string;
   identityConfigured: boolean;
   realtime: string;
@@ -128,15 +130,18 @@ function App() {
     [mode, setMode] = useState(""),
     [identityConfigured, setIdentityConfigured] = useState(false),
     [realtime, setRealtime] = useState("sse"),
+    [sessionError, setSessionError] = useState(""),
     [online, setOnline] = useState(navigator.onLine);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (requireSession = false) => {
     try {
       const result = await api("/auth/me");
       setUser(result.user);
       setCsrf(result.csrf);
-    } catch {
+    } catch (e) {
       setUser(null);
       setCsrf("");
+      if (requireSession || !(e instanceof ApiError) || e.status !== 401)
+        throw e;
     } finally {
       setLoading(false);
     }
@@ -149,11 +154,20 @@ function App() {
         setRealtime(c.realtime);
       })
       .catch(() => setMode("unavailable"));
-    void refresh();
+    void refresh().catch((e) => setSessionError(e.message));
+    const expired = () => {
+      setUser(null);
+      setCsrf("");
+      setSessionError(
+        "Your session has ended or access was revoked. Please sign in again.",
+      );
+    };
+    window.addEventListener("response:unauthorized", expired);
     const on = () => setOnline(navigator.onLine);
     window.addEventListener("online", on);
     window.addEventListener("offline", on);
     return () => {
+      window.removeEventListener("response:unauthorized", expired);
       window.removeEventListener("online", on);
       window.removeEventListener("offline", on);
     };
@@ -178,20 +192,39 @@ function App() {
           </span>
         </div>
       )}
+      {!user && sessionError && (
+        <div className="session-error" role="alert">
+          {sessionError}
+          <button
+            onClick={() => {
+              setSessionError("");
+              void refresh().catch((e) => setSessionError(e.message));
+            }}
+          >
+            Retry connection
+          </button>
+        </div>
+      )}
       {!user ? <Landing /> : <Shell />}
     </Session.Provider>
   );
 }
 function Landing() {
-  const { mode, refresh, identityConfigured } = useContext(Session),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const navigate = useNavigate();
-  async function demo(email: string) {
+  const { mode, refresh, identityConfigured } = useContext(Session);
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [role, setRole] = useState("citizen");
+  const navigate = useNavigate(),
+    location = useLocation();
+  const development = location.pathname === "/development" && mode === "demo";
+  async function signIn(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
     setBusy(true);
+    setError("");
     try {
-      await post("/auth/demo", { email });
-      await refresh();
+      await post("/auth/demo", { email: `${role}@demo.invalid` });
+      await refresh(true);
       navigate("/");
     } catch (e) {
       setError((e as Error).message);
@@ -200,98 +233,175 @@ function Landing() {
     }
   }
   return (
-    <div className="landing">
-      <div className="brand">
-        <ShieldCheck />
-        <span>
-          response<span className="brand-dot">.</span>
-        </span>
-      </div>
-      <section>
-        <div className="eyebrow">
-          Prepared together. Connected when it matters.
-        </div>
-        <h1>
-          A clearer path
-          <br />
-          from help to response.
-        </h1>
-        <p>
-          Report an emergency, coordinate the right teams, and keep the people
-          who need help informed.
-        </p>
-        {identityConfigured ? (
-          <div className="landing-actions">
-            <a className="button primary" href="/api/v1/auth/login">
-              Sign in <ArrowUpRight size={18} />
-            </a>
-            <a className="button" href="/api/v1/auth/register">
-              Create a citizen account
-            </a>
-            <a href="/api/v1/auth/recover">Forgot password?</a>
-            <span>
-              Authority and rescue accounts require an administrator invitation.
-              All accounts use email verification and an authenticator.
-            </span>
-          </div>
-        ) : (
-          <p className="notice">
-            {mode === "demo"
-              ? "Use a demonstration account below. Personal registration becomes available when secure sign-in is configured."
-              : "Sign-in is temporarily unavailable. Please contact the project administrator."}
+    <div className="entry-page">
+      <header className="entry-header">
+        <Link className="brand" to="/">
+          <ShieldCheck />
+          <span>
+            response<span className="brand-dot">.</span>
+          </span>
+        </Link>
+        <span>Emergency coordination platform</span>
+      </header>
+      <main className="entry-content">
+        <div className="entry-intro">
+          <div className="eyebrow">Report · Coordinate · Respond</div>
+          <h1>Disaster Response and Management System</h1>
+          <p>
+            A shared workspace for citizen reports, authorized dispatch and
+            accountable field response.
           </p>
-        )}
-        <div className="notice">
-          <ShieldCheck size={20} />
-          This platform supports coordination. A submitted request does not
-          guarantee that emergency services have accepted it. For immediate
-          danger, contact your verified local emergency number.
-        </div>
-        <ErrorBox message={error} />
-        {mode === "demo" && (
-          <div className="demo-login">
-            <h2>Explore the local demonstration</h2>
-            <p>
-              These isolated sample accounts do not use Cognito or send SMS.
-            </p>
-            <div className="button-row">
-              {["citizen", "authority", "rescuer", "admin"].map((role) => (
-                <button
-                  disabled={busy}
-                  key={role}
-                  onClick={() => demo(`${role}@demo.invalid`)}
-                >
-                  Demo {label(role)} <ChevronRight size={16} />
-                </button>
-              ))}
+          <div className="entry-features">
+            <div>
+              <ClipboardList />
+              <span>
+                <strong>Report with clarity</strong>Share the location, hazards
+                and assistance needed.
+              </span>
+            </div>
+            <div>
+              <Users />
+              <span>
+                <strong>Coordinate the response</strong>Assign qualified teams
+                with clear ownership.
+              </span>
+            </div>
+            <div>
+              <Activity />
+              <span>
+                <strong>Follow every update</strong>Keep acceptance, dispatch
+                and arrival distinct.
+              </span>
             </div>
           </div>
-        )}
-      </section>
-      <aside className="landing-art">
-        <div className="radar">
-          <div />
-          <div />
-          <ShieldCheck size={58} />
+          <EmergencyFallback />
         </div>
-        <span>REPORT → COORDINATE → RESPOND</span>
-        <h2>
-          Every update.
-          <br />A shared understanding.
-        </h2>
-        <p>
-          Clear status. Authorized tracking.
-          <br />
-          Accountable decisions.
-        </p>
-      </aside>
-      <footer>Cloud-Enabled Disaster Response and Management System</footer>
+        <section
+          className="entry-card"
+          aria-label={development ? "Development access" : "Sign in"}
+        >
+          <ShieldCheck className="entry-symbol" size={32} />
+          <h2>
+            {development
+              ? "Development / Demo Mode"
+              : "Sign in to your workspace"}
+          </h2>
+          {development ? (
+            <>
+              <p>
+                Local test identities only. These accounts do not contact
+                official services or send external notifications.
+              </p>
+              <form onSubmit={signIn}>
+                <label>
+                  Demo role
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    {["citizen", "authority", "rescuer", "admin"].map((r) => (
+                      <option key={r} value={r}>
+                        {label(r)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <ErrorBox message={error} />
+                <button className="primary full-width" disabled={busy}>
+                  {busy ? "Signing in…" : "Continue with local account"}
+                </button>
+              </form>
+              <p className="muted">
+                If accounts are missing, run <code>npm run setup:demo</code> and
+                restart with <code>npm run dev:demo</code>.
+              </p>
+              <Link to="/">Back to normal sign-in</Link>
+            </>
+          ) : (
+            <>
+              <p>
+                Citizens, coordinators, responders and administrators use secure
+                role-based access.
+              </p>
+              {identityConfigured ? (
+                <>
+                  <a
+                    className="button primary full-width"
+                    href="/api/v1/auth/login"
+                  >
+                    Sign in <ArrowUpRight size={18} />
+                  </a>
+                  <a className="button full-width" href="/api/v1/auth/register">
+                    Register as a citizen
+                  </a>
+                  <a className="recovery-link" href="/api/v1/auth/recover">
+                    Forgot password?
+                  </a>
+                  <p className="muted">
+                    Cognito manages passwords, email verification and
+                    authenticator enrollment. Operational accounts require an
+                    administrator invitation.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <button className="primary full-width" disabled>
+                    Sign in
+                  </button>
+                  <div className="notice">
+                    {mode === "unavailable"
+                      ? "The backend is unavailable. Start the application and retry."
+                      : "Cognito sign-in is not configured in this environment. An administrator must configure the identity provider before normal sign-in and citizen registration are available."}
+                  </div>
+                  <button onClick={() => window.location.reload()}>
+                    Retry connection
+                  </button>
+                </>
+              )}
+              {mode === "demo" && (
+                <div className="development-link">
+                  <span>Local development tools</span>
+                  <Link to="/development">
+                    Open Development / Demo Mode <ChevronRight size={16} />
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </main>
+      <footer className="entry-footer">
+        A coordination platform. A submitted report does not guarantee
+        acceptance or dispatch by emergency services.
+      </footer>
     </div>
+  );
+}
+function Protected({
+  roles,
+  children,
+}: {
+  roles: string[];
+  children: React.ReactNode;
+}) {
+  const { user } = useContext(Session);
+  return roles.includes(user!.role) ? (
+    children
+  ) : (
+    <section className="panel">
+      <h1>Access restricted</h1>
+      <p>
+        Your role cannot open this workspace. Operational permissions are
+        enforced by the backend.
+      </p>
+      <Link to="/">Return to your dashboard</Link>
+    </section>
   );
 }
 function Shell() {
   const { user } = useContext(Session);
   const citizen = user!.role === "CITIZEN";
+  const notifications = useData("/notifications", 10000);
   const links: [string, string, React.ReactNode][] = [
     ["/", "Overview", <LayoutDashboard size={19} />],
     [
@@ -311,6 +421,9 @@ function Shell() {
     links.push(["/admin", "Administration", <Settings size={19} />]);
   return (
     <div className="app-shell">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       <aside className="sidebar">
         <Link to="/" className="brand">
           <ShieldCheck />
@@ -357,9 +470,14 @@ function Shell() {
             aria-label="Notifications"
           >
             <Bell size={20} />
+            {!!notifications.data?.unread && (
+              <span className="notification-count">
+                {notifications.data.unread}
+              </span>
+            )}
           </Link>
         </div>
-        <main>
+        <main id="main-content" tabIndex={-1}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/report" element={<ReportForm />} />
@@ -368,9 +486,30 @@ function Shell() {
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/situation" element={<Situation />} />
             <Route path="/resource-map" element={<ResourceMap />} />
-            <Route path="/teams" element={<Teams />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/metrics" element={<OperationalMetrics />} />
+            <Route
+              path="/teams"
+              element={
+                <Protected roles={["ADMIN", "AUTHORITY", "RESCUER"]}>
+                  <Teams />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <Protected roles={["ADMIN"]}>
+                  <Admin />
+                </Protected>
+              }
+            />
+            <Route
+              path="/metrics"
+              element={
+                <Protected roles={["ADMIN", "AUTHORITY"]}>
+                  <OperationalMetrics />
+                </Protected>
+              }
+            />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route
@@ -392,117 +531,8 @@ function Shell() {
   );
 }
 function Dashboard() {
-  const { user } = useContext(Session),
-    { data, error } = useData("/incidents");
-  const citizen = user!.role === "CITIZEN";
-  const alerts = useData("/announcements");
-  const active =
-    data?.items.filter(
-      (i: any) => !["RESOLVED", "CANCELLED", "DUPLICATE"].includes(i.status),
-    ).length ?? 0;
-  return (
-    <>
-      <PageHead
-        eyebrow="Connected communities. Coordinated response."
-        title={citizen ? "Help starts here." : "A clear view of the response."}
-        description={
-          citizen
-            ? "Report what’s happening. Stay informed. Get the next update."
-            : "Review incoming incidents and coordinate accountable action."
-        }
-      >
-        <span className="date-pill">
-          {new Date().toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })}
-        </span>
-      </PageHead>
-      <ErrorBox message={error} />
-      {citizen ? (
-        <div className="action-grid">
-          <Link to="/report?kind=EMERGENCY" className="emergency-action">
-            <div>
-              <span className="action-icon">
-                <Plus size={30} />
-              </span>
-              <ArrowUpRight />
-            </div>
-            <span className="eyebrow">When you need assistance</span>
-            <h2>Need help</h2>
-            <p>Send an emergency request with your location.</p>
-            <span className="action-link">
-              Request assistance <ChevronRight size={17} />
-            </span>
-          </Link>
-          <Link to="/report?kind=REPORT" className="report-action">
-            <div>
-              <span className="action-icon">
-                <MapPin size={28} />
-              </span>
-              <ArrowUpRight />
-            </div>
-            <span className="eyebrow">Keep your community informed</span>
-            <h2>Report a problem</h2>
-            <p>Share an incident or hazard in your area.</p>
-            <span className="action-link">
-              Create a report <ChevronRight size={17} />
-            </span>
-          </Link>
-        </div>
-      ) : (
-        <div className="stats">
-          <Stat name="Visible incidents" value={data?.items.length ?? "—"} />
-          <Stat name="Active in this view" value={active} />
-          <Stat
-            name="Awaiting acknowledgement"
-            value={
-              data?.items.filter((i: any) => i.status === "SUBMITTED").length ??
-              "—"
-            }
-          />
-        </div>
-      )}
-      <EmergencyFallback />
-      <div className="section-heading">
-        <h2>{citizen ? "Your recent reports" : "Incident inbox"}</h2>
-        <Link to="/reports">
-          View all <ArrowUpRight size={15} />
-        </Link>
-      </div>
-      <IncidentList items={data?.items.slice(0, 4)} loading={!data && !error} />
-      <div className="two-columns">
-        <Link className="secondary-card" to="/situation">
-          <MapPin />
-          <div>
-            <h3>Local situation</h3>
-            <p>Reviewed updates from your community.</p>
-          </div>
-          <ArrowUpRight />
-        </Link>
-        <Link className="secondary-card" to="/announcements">
-          <Bell />
-          <div>
-            <h3>Official announcements</h3>
-            <p>
-              {alerts.data?.items.length ?? 0} current notices from platform
-              authorities.
-            </p>
-          </div>
-          <ArrowUpRight />
-        </Link>
-      </div>
-    </>
-  );
-}
-function Stat({ name, value }: { name: string; value: React.ReactNode }) {
-  return (
-    <div className="stat">
-      <span>{name}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+  const { user } = useContext(Session);
+  return <OperationalDashboard role={user!.role} />;
 }
 function EmergencyFallback() {
   const { data } = useData("/auth/config");
@@ -523,78 +553,9 @@ function EmergencyFallback() {
     </div>
   );
 }
-function IncidentList({
-  items,
-  loading = false,
-}: {
-  items?: any[];
-  loading?: boolean;
-}) {
-  if (loading) return <div className="empty">Loading reports…</div>;
-  if (!items?.length)
-    return (
-      <Empty>
-        No reports here yet. New reports and their status will appear here.
-      </Empty>
-    );
-  return (
-    <div className="incident-list">
-      {items.map((i) => (
-        <Link key={i.id} to={`/incidents/${i.id}`} className="incident-row">
-          <div className={`incident-icon ${i.severity?.toLowerCase()}`}>
-            <Activity size={21} />
-          </div>
-          <div className="incident-name">
-            <strong>{i.label ?? label(i.category)}</strong>
-            <span>
-              #{i.id.slice(0, 8)} · {new Date(i.created_at).toLocaleString()}
-            </span>
-          </div>
-          <Badge value={i.severity} />
-          <Badge value={i.status} />
-          <ChevronRight size={18} />
-        </Link>
-      ))}
-    </div>
-  );
-}
 function Reports() {
-  const { data, error, reload } = useData("/incidents"),
-    [filter, setFilter] = useState("ALL");
-  return (
-    <>
-      <PageHead
-        title="Incident reports"
-        description="Submission, acknowledgement, dispatch and arrival are tracked separately."
-      >
-        <button onClick={reload}>
-          <RefreshCw size={16} />
-          Refresh
-        </button>
-      </PageHead>
-      <ErrorBox message={error} />
-      <div className="filter-row">
-        {["ALL", "SUBMITTED", "ACKNOWLEDGED", "DISPATCHED", "RESOLVED"].map(
-          (f) => (
-            <button
-              className={f === filter ? "selected" : ""}
-              key={f}
-              onClick={() => setFilter(f)}
-            >
-              {label(f)}
-            </button>
-          ),
-        )}
-      </div>
-      <IncidentList
-        items={data?.items.filter(
-          (i: any) => filter === "ALL" || i.status === filter,
-        )}
-        loading={!data && !error}
-      />
-      <p className="muted">Showing the latest 30 authorized reports.</p>
-    </>
-  );
+  const { user } = useContext(Session);
+  return <OperationalDashboard role={user!.role} queueOnly />;
 }
 function ReportForm() {
   const { user } = useContext(Session);
@@ -610,6 +571,9 @@ function ReportForm() {
     ),
     [latitude, setLatitude] = useState(""),
     [longitude, setLongitude] = useState(""),
+    [peopleAffected, setPeopleAffected] = useState(""),
+    [hazards, setHazards] = useState(""),
+    [accuracy, setAccuracy] = useState<number | undefined>(),
     [description, setDescription] = useState(""),
     [address, setAddress] = useState(""),
     [error, setError] = useState(""),
@@ -625,6 +589,7 @@ function ReportForm() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         if (!active || manuallyCorrected.current) return;
+        setAccuracy(position.coords.accuracy);
         setLatitude(String(position.coords.latitude));
         setLongitude(String(position.coords.longitude));
         setGps(
@@ -646,9 +611,16 @@ function ReportForm() {
   if (user?.role !== "CITIZEN")
     return <Empty>Only citizen accounts can submit reports.</Empty>;
   function locate() {
+    if (!navigator.geolocation) {
+      setGps(
+        "This browser does not support geolocation. Enter coordinates manually.",
+      );
+      return;
+    }
     setGps("Finding your location…");
     navigator.geolocation.getCurrentPosition(
       (p) => {
+        setAccuracy(p.coords.accuracy);
         setLatitude(String(p.coords.latitude));
         setLongitude(String(p.coords.longitude));
         setGps(
@@ -675,6 +647,9 @@ function ReportForm() {
         longitude: Number(longitude),
         description,
         address,
+        hazards,
+        ...(peopleAffected ? { peopleAffected: Number(peopleAffected) } : {}),
+        ...(accuracy !== undefined ? { locationAccuracyM: accuracy } : {}),
       };
       const serialized = JSON.stringify(body);
       if (submission.current.body !== serialized)
@@ -779,6 +754,7 @@ function ReportForm() {
             longitude={longitude}
             onPick={(lat, lon, foundAddress) => {
               manuallyCorrected.current = true;
+              setAccuracy(undefined);
               setLatitude(String(lat));
               setLongitude(String(lon));
               if (foundAddress) setAddress(foundAddress);
@@ -805,6 +781,7 @@ function ReportForm() {
                 value={latitude}
                 onChange={(e) => {
                   manuallyCorrected.current = true;
+                  setAccuracy(undefined);
                   setLatitude(e.target.value);
                 }}
                 placeholder="e.g. 19.0760"
@@ -821,6 +798,7 @@ function ReportForm() {
                 value={longitude}
                 onChange={(e) => {
                   manuallyCorrected.current = true;
+                  setAccuracy(undefined);
                   setLongitude(e.target.value);
                 }}
                 placeholder="e.g. 72.8777"
@@ -845,6 +823,28 @@ function ReportForm() {
               rows={3}
             />
           </label>
+          <div className="two-columns">
+            <label>
+              Estimated people affected (optional)
+              <input
+                type="number"
+                min="1"
+                max="1000000"
+                value={peopleAffected}
+                onChange={(e) => setPeopleAffected(e.target.value)}
+              />
+            </label>
+            <label>
+              Immediate hazards (optional)
+              <textarea
+                maxLength={1000}
+                rows={2}
+                placeholder="Smoke, unstable structures, traffic or other observed hazards"
+                value={hazards}
+                onChange={(e) => setHazards(e.target.value)}
+              />
+            </label>
+          </div>
           <label>
             Photograph <span>(optional · JPEG/PNG, up to 5 MB)</span>
             <input
@@ -880,6 +880,7 @@ function ReportForm() {
   );
 }
 function IncidentDetail() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const { user, realtime } = useContext(Session);
   const { data: i, error, reload } = useData(`/incidents/${id}`);
@@ -888,7 +889,13 @@ function IncidentDetail() {
     [busy, setBusy] = useState(false),
     [eligible, setEligible] = useState<any[]>([]),
     [team, setTeam] = useState(""),
-    [live, setLive] = useState("Connecting");
+    [live, setLive] = useState("Connecting"),
+    [assignmentAction, setAssignmentAction] = useState<{
+      id: string;
+      status: string;
+    } | null>(null),
+    [outcome, setOutcome] = useState(""),
+    [supplement, setSupplement] = useState("");
   const dispatcher = ["ADMIN", "AUTHORITY"].includes(user!.role);
   useEffect(() => {
     if (realtime === "poll") {
@@ -917,12 +924,23 @@ function IncidentDetail() {
     return () => events.close();
   }, [id, realtime, reload, tracking.reload]);
   async function act(path: string, body: unknown) {
+    if (busy) return;
     setBusy(true);
     setActionError("");
     try {
       await post(path, body, crypto.randomUUID());
+      if (
+        path.startsWith("/assignments/") &&
+        (body as { status?: string }).status === "DECLINED"
+      ) {
+        navigate("/");
+        return;
+      }
       await reload();
       await tracking.reload();
+      setAssignmentAction(null);
+      setOutcome("");
+      setSupplement("");
     } catch (e) {
       setActionError((e as Error).message);
     } finally {
@@ -965,6 +983,40 @@ function IncidentDetail() {
               <Badge value={i.severity} />
             </div>
             <p>{i.description || "No additional description provided."}</p>
+            <div className="incident-facts">
+              <div>
+                <span>Estimated people affected</span>
+                <strong>{i.people_affected ?? "Not reported"}</strong>
+              </div>
+              <div>
+                <span>Location uncertainty</span>
+                <strong>
+                  {i.location_accuracy_m != null
+                    ? `Approximately ${Math.round(i.location_accuracy_m)} m`
+                    : "Not reported / manually selected"}
+                </strong>
+              </div>
+            </div>
+            {i.hazards && (
+              <div className="notice warning">
+                <AlertTriangle size={18} />
+                <span>
+                  <strong>Reported hazards:</strong> {i.hazards}
+                </span>
+              </div>
+            )}
+            <a
+              className="navigation-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`https://www.google.com/maps/dir/?api=1&destination=${i.latitude},${i.longitude}`}
+            >
+              Open navigation in external maps <Navigation size={15} />
+            </a>
+            <small>
+              Opening navigation shares these coordinates with the selected
+              external map provider.
+            </small>
             <p className="location-line">
               <MapPin size={17} />
               {i.address ||
@@ -1038,7 +1090,9 @@ function IncidentDetail() {
               ["SUBMITTED", "NEEDS_VERIFICATION"].includes(i.status) && (
                 <button
                   onClick={() =>
-                    act(`/incidents/${id}/status`, { status: "CANCELLED" })
+                    window.confirm(
+                      "Withdraw this unacknowledged request? Its audit history will remain.",
+                    ) && act(`/incidents/${id}/status`, { status: "CANCELLED" })
                   }
                 >
                   Cancel my request
@@ -1058,6 +1112,11 @@ function IncidentDetail() {
                   <small>{a.department}</small>
                 </div>
                 <Badge value={a.status} />
+                {a.outcome_note && (
+                  <p className="muted">
+                    Recorded outcome / reason: {a.outcome_note}
+                  </p>
+                )}
                 <div className="button-row">
                   {user!.role === "RESCUER" &&
                     (
@@ -1073,7 +1132,10 @@ function IncidentDetail() {
                         key={s}
                         disabled={busy}
                         onClick={() =>
-                          act(`/assignments/${a.id}/status`, { status: s })
+                          ["DECLINED", "COMPLETED"].includes(s)
+                            ? (setAssignmentAction({ id: a.id, status: s }),
+                              setOutcome(""))
+                            : act(`/assignments/${a.id}/status`, { status: s })
                         }
                       >
                         {label(s)}
@@ -1098,11 +1160,13 @@ function IncidentDetail() {
                     ) && (
                       <button
                         disabled={busy}
-                        onClick={() =>
-                          act(`/assignments/${a.id}/status`, {
+                        onClick={() => (
+                          setAssignmentAction({
+                            id: a.id,
                             status: "CANCELLED",
-                          })
-                        }
+                          }),
+                          setOutcome("")
+                        )}
                       >
                         Cancel assignment
                       </button>
@@ -1157,6 +1221,93 @@ function IncidentDetail() {
                 </div>
               )}
           </div>
+          {assignmentAction && (
+            <form
+              className="panel outcome-form"
+              aria-label="Assignment outcome"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act(`/assignments/${assignmentAction.id}/status`, {
+                  status: assignmentAction.status,
+                  note: outcome,
+                });
+              }}
+            >
+              <h2>
+                {label(assignmentAction.status)} — record{" "}
+                {assignmentAction.status === "COMPLETED"
+                  ? "the outcome"
+                  : "a reason"}
+              </h2>
+              <label>
+                Reason or outcome
+                <textarea
+                  autoFocus
+                  required
+                  minLength={5}
+                  maxLength={1000}
+                  value={outcome}
+                  onChange={(e) => setOutcome(e.target.value)}
+                />
+              </label>
+              <p>
+                Record observed results and remaining needs. A status change
+                alone does not prove that everyone is safe.
+              </p>
+              <div className="button-row">
+                <button className="primary" disabled={busy}>
+                  Confirm {label(assignmentAction.status)}
+                </button>
+                <button type="button" onClick={() => setAssignmentAction(null)}>
+                  Keep current status
+                </button>
+              </div>
+            </form>
+          )}
+          <section className="panel">
+            <h2>Supplementary updates</h2>
+            {i.updates?.map((u: any) => (
+              <article className="report-update" key={u.id}>
+                <p>{u.body}</p>
+                <small>
+                  {label(u.actor_role)} ·{" "}
+                  {new Date(u.created_at).toLocaleString()}
+                </small>
+              </article>
+            ))}
+            {!i.updates?.length && (
+              <p className="muted">No supplementary information yet.</p>
+            )}
+            {![
+              "RESOLVED",
+              "CANCELLED",
+              "DUPLICATE",
+              "UNABLE_TO_RESPOND",
+            ].includes(i.status) && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void act(`/incidents/${id}/updates`, { body: supplement });
+                }}
+              >
+                <label>
+                  Add information
+                  <textarea
+                    required
+                    minLength={3}
+                    maxLength={2000}
+                    value={supplement}
+                    onChange={(e) => setSupplement(e.target.value)}
+                  />
+                </label>
+                <button disabled={busy}>Add update</button>
+                <p className="muted">
+                  Updates are permanent and visible only to authorized
+                  participants.
+                </p>
+              </form>
+            )}
+          </section>
           <EvidenceList items={i.evidence ?? []} />
           {dispatcher && <ResourceConsole incidentId={id!} />}
           <Tracking data={tracking.data} error={tracking.error} />
@@ -1713,12 +1864,12 @@ function Situation() {
   );
 }
 function Notifications() {
-  const { data, error, reload } = useData("/notifications");
+  const { data, error, reload } = useData("/notifications", 5000);
   return (
     <>
       <PageHead
         title="Your notifications"
-        description="Available in-app and submitted SMS messages are not proof of human acknowledgement."
+        description="In-app, SMS and email updates. Simulated means no external delivery; submitted means provider acceptance only."
       />
       <ErrorBox message={error} />
       {data?.items.length ? (
@@ -1726,22 +1877,48 @@ function Notifications() {
           <div className="panel notification" key={n.id}>
             <Bell size={20} />
             <div>
-              <h3>Incident coordination update</h3>
+              <h3>{label(n.type ?? "COORDINATION_UPDATE")}</h3>
               <p>
                 {label(n.channel)} · <Badge value={n.status} />
               </p>
               <small>{new Date(n.created_at).toLocaleString()}</small>
+              {n.status === "SIMULATED" && (
+                <p className="muted">
+                  Local test sink. No message was sent externally.
+                </p>
+              )}
+              {n.attempts?.length > 0 && (
+                <details>
+                  <summary>{n.attempts.length} delivery attempts</summary>
+                  {n.attempts.map((a: any, index: number) => (
+                    <p key={index}>
+                      {label(a.outcome)} · {new Date(a.at).toLocaleString()}{" "}
+                      {a.error ? `· ${a.error}` : ""}
+                    </p>
+                  ))}
+                </details>
+              )}
             </div>
-            {n.incident_id && (
+            {n.incident_id && n.can_open && (
               <Link to={`/incidents/${n.incident_id}`}>
                 Review authorized details
               </Link>
             )}
+            {n.incident_id && !n.can_open && (
+              <p className="muted">
+                Detailed access requires an active authorized scope or
+                assignment. This alert is not a dispatch order.
+              </p>
+            )}
             {!n.read_at && (
               <button
                 onClick={async () => {
-                  await post(`/notifications/${n.id}/read`);
-                  await reload();
+                  try {
+                    await post(`/notifications/${n.id}/read`);
+                    await reload();
+                  } catch (e) {
+                    window.alert((e as Error).message);
+                  }
                 }}
               >
                 Mark read
@@ -1802,10 +1979,14 @@ function Profile() {
           </button>
           <button
             onClick={async () => {
-              const r = await post("/auth/logout");
-              await refresh();
-              navigate("/");
-              if (r.logoutUrl) window.location.assign(r.logoutUrl);
+              try {
+                const r = await post("/auth/logout");
+                await refresh();
+                navigate("/");
+                if (r.logoutUrl) window.location.assign(r.logoutUrl);
+              } catch (e) {
+                setMessage((e as Error).message);
+              }
             }}
           >
             <LogOut size={17} />
@@ -1830,11 +2011,16 @@ function Admin() {
     inviteTeams = useData("/teams");
   const [tab, setTab] = useState("Accounts"),
     [error, setError] = useState(""),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [inviting, setInviting] = useState(false);
   if (user!.role !== "ADMIN")
     return <Empty>Administrator access required.</Empty>;
   async function provision(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (inviting) return;
+    setInviting(true);
+    setError("");
+    setMessage("");
     const f = new FormData(e.currentTarget);
     try {
       await post("/admin/users", {
@@ -1851,6 +2037,8 @@ function Admin() {
       await users.reload();
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setInviting(false);
     }
   }
   return (
@@ -1928,7 +2116,9 @@ function Admin() {
                 </select>
               </label>
             </div>
-            <button className="primary">Send invitation</button>
+            <button className="primary" disabled={inviting}>
+              {inviting ? "Sending invitation…" : "Send invitation"}
+            </button>
           </form>
           <div className="panel table-wrap">
             <table>
@@ -1975,6 +2165,12 @@ function Admin() {
                         <button
                           onClick={async () => {
                             try {
+                              if (
+                                !window.confirm(
+                                  `${u.status === "ACTIVE" ? "Suspend" : "Activate"} this account? Active sessions may be revoked.`,
+                                )
+                              )
+                                return;
                               const r = await post(
                                 `/admin/users/${u.id}/status`,
                                 {
@@ -2012,8 +2208,9 @@ function Admin() {
         <div className="panel">
           <h2>Escalation policies</h2>
           <p>
-            Demonstration defaults. Critical incidents continue escalating until
-            dispatch.
+            Configurable ring expansion. Accepted assignments pause automatic
+            expansion while awaiting authorized dispatch; dispatchers can
+            request manual review.
           </p>
           {policies.data?.items.map((p: any) => (
             <form

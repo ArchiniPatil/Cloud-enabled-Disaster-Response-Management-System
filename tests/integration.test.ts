@@ -15,8 +15,10 @@ import {
   maintenance,
   sendNotifications,
   exportAnalytics,
+  queueExternalNotifications,
 } from "../apps/api/src/jobs";
 import { LocationClient } from "@aws-sdk/client-location";
+import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { SNSClient } from "@aws-sdk/client-sns";
 import { config } from "../apps/api/src/config";
 import { s3 } from "../apps/api/src/evidence";
@@ -270,6 +272,18 @@ describe("real PostGIS API workflow and security boundaries", () => {
       .expect(200);
     expect(matches.body.items[0].id).toBe(teamId);
     expect(matches.body.items[0].distance_m).toBeLessThan(200);
+    await pool.query(
+      "UPDATE incidents SET location_accuracy_m=30000 WHERE id=$1",
+      [incidentId],
+    );
+    const uncertain = await authority.agent
+      .get(`/api/v1/incidents/${incidentId}/eligible-teams`)
+      .expect(200);
+    expect(uncertain.body.items).toHaveLength(0);
+    await pool.query(
+      "UPDATE incidents SET location_accuracy_m=NULL WHERE id=$1",
+      [incidentId],
+    );
     await post(rescuer, "/locations/updates", {
       sessionId: locationSession,
       latitude: 19,
@@ -357,6 +371,11 @@ describe("real PostGIS API workflow and security boundaries", () => {
     for (const status of ["EN_ROUTE", "ARRIVED", "IN_PROGRESS", "COMPLETED"])
       await post(rescuer, `/assignments/${assignmentId}/status`, {
         status,
+        ...(status === "COMPLETED"
+          ? {
+              note: "Controlled test outcome: assistance provided and remaining needs reviewed",
+            }
+          : {}),
       }).expect(200);
     const r = await citizen.agent
       .get(`/api/v1/incidents/${incidentId}`)
@@ -1025,18 +1044,16 @@ describe("real PostGIS API workflow and security boundaries", () => {
     await citizen.agent.get("/api/v1/locations/search?q=Mumbai").expect(503);
     const previous = config.LOCATION_PLACE_INDEX;
     config.LOCATION_PLACE_INDEX = "test-index";
-    const spy = vi
-      .spyOn(LocationClient.prototype, "send")
-      .mockResolvedValue({
-        Results: [
-          {
-            Place: {
-              Label: "Test result",
-              Geometry: { Point: [72.8777, 19.076] },
-            },
+    const spy = vi.spyOn(LocationClient.prototype, "send").mockResolvedValue({
+      Results: [
+        {
+          Place: {
+            Label: "Test result",
+            Geometry: { Point: [72.8777, 19.076] },
           },
-        ],
-      } as never);
+        },
+      ],
+    } as never);
     try {
       const r = await citizen.agent
         .get("/api/v1/locations/search?q=Mumbai")
@@ -1049,6 +1066,264 @@ describe("real PostGIS API workflow and security boundaries", () => {
     } finally {
       spy.mockRestore();
       config.LOCATION_PLACE_INDEX = previous;
+    }
+  });
+
+  it("accepts explicit local loopback aliases and rejects foreign origins without exposing demo in Cognito mode", async () => {
+    const local = request.agent(app);
+    await local
+      .post("/api/v1/auth/demo")
+      .set("Origin", "http://127.0.0.1:5173")
+      .send({ email: "citizen@demo.invalid" })
+      .expect(200);
+    const me = await local.get("/api/v1/auth/me").expect(200);
+    await local
+      .post("/api/v1/auth/logout")
+      .set("Origin", "http://127.0.0.1:5173")
+      .set("X-CSRF-Token", me.body.csrf)
+      .send({})
+      .expect(200);
+    await local.get("/api/v1/auth/me").expect(401);
+    for (const bad of [
+      "https://evil.example",
+      "http://localhost.evil.example:5173",
+      "http://localhost:9999",
+    ])
+      await local
+        .post("/api/v1/auth/demo")
+        .set("Origin", bad)
+        .send({ email: "admin@demo.invalid" })
+        .expect(403);
+    await pool.query("UPDATE user_profiles SET status='INACTIVE' WHERE id=$1", [
+      citizen.user.id,
+    ]);
+    try {
+      const missing = await local
+        .post("/api/v1/auth/demo")
+        .set("Origin", origin)
+        .send({ email: "citizen@demo.invalid" })
+        .expect(503);
+      expect(missing.body.error.message).toContain("setup:demo");
+    } finally {
+      await pool.query("UPDATE user_profiles SET status='ACTIVE' WHERE id=$1", [
+        citizen.user.id,
+      ]);
+    }
+  });
+  it("reports aggregate totals beyond one page and applies priority, search, filters and role scope on the server", async () => {
+    const marker = `summary-${randomUUID()}`;
+    for (let n = 0; n < 32; n++)
+      await post(citizen, "/incidents", {
+        ...body,
+        address: marker,
+        severity: n === 31 ? "CRITICAL" : "LOW",
+      }).expect(201);
+    const list = await citizen.agent
+      .get(`/api/v1/incidents?q=${marker}&limit=20`)
+      .expect(200);
+    expect(list.body.total).toBe(32);
+    expect(list.body.items).toHaveLength(20);
+    expect(list.body.items[0].severity).toBe("CRITICAL");
+    const summary = await citizen.agent
+      .get(`/api/v1/incidents/summary?q=${marker}`)
+      .expect(200);
+    expect(summary.body.total).toBe(32);
+    expect(summary.body.critical).toBe(1);
+    expect(summary.body.unassigned).toBe(32);
+    const severe = await authority.agent
+      .get(`/api/v1/incidents?q=${marker}&severity=CRITICAL&hours=24`)
+      .expect(200);
+    expect(severe.body.total).toBe(1);
+    const scoped = await rescuer.agent
+      .get(`/api/v1/incidents/summary?q=${marker}`)
+      .expect(200);
+    expect(scoped.body.total).toBe(0);
+    await citizen.agent.get("/api/v1/incidents?severity=INVENTED").expect(400);
+    expect(
+      (await citizen.agent.get("/api/v1/incidents?q=%25").expect(200)).body
+        .total,
+    ).toBe(0);
+  });
+  it("persists hazard and affected-person data with authorized append-only idempotent updates", async () => {
+    const r = await post(citizen, "/incidents", {
+        ...body,
+        peopleAffected: 3,
+        hazards: "Smoke near the entrance",
+        locationAccuracyM: 25,
+      }).expect(201),
+      id = r.body.id;
+    const key = randomUUID();
+    const first = await post(
+      citizen,
+      `/incidents/${id}/updates`,
+      { body: "Entrance now accessible on the east side" },
+      key,
+    ).expect(201);
+    const repeated = await post(
+      citizen,
+      `/incidents/${id}/updates`,
+      { body: "Entrance now accessible on the east side" },
+      key,
+    ).expect(201);
+    expect(first.body.id).toBe(repeated.body.id);
+    await post(rescuer, `/incidents/${id}/updates`, {
+      body: "Unassigned access",
+    }).expect(404);
+    const detail = await authority.agent
+      .get(`/api/v1/incidents/${id}`)
+      .expect(200);
+    expect(detail.body.people_affected).toBe(3);
+    expect(detail.body.hazards).toContain("Smoke");
+    expect(detail.body.updates).toHaveLength(1);
+    await expect(
+      pool.query("DELETE FROM incident_updates WHERE incident_id=$1", [id]),
+    ).rejects.toThrow("Append-only");
+    await post(citizen, "/incidents", { ...body, peopleAffected: -1 }).expect(
+      400,
+    );
+    await post(citizen, `/incidents/${id}/status`, {
+      status: "CANCELLED",
+    }).expect(200);
+    await post(citizen, `/incidents/${id}/updates`, {
+      body: "A closed update",
+    }).expect(409);
+  });
+  it("requires decline/completion outcomes and pauses automatic rings for an accepted assignment", async () => {
+    const id = await report();
+    await post(authority, `/incidents/${id}/status`, {
+      status: "ACKNOWLEDGED",
+    }).expect(200);
+    // Insert an offer to focus this test on transitions; eligibility/capacity is covered by the earlier live API workflow.
+    const a = (
+      await pool.query(
+        "INSERT INTO incident_assignments(incident_id,team_id) VALUES($1,$2) RETURNING id",
+        [id, teamId],
+      )
+    ).rows[0];
+    await post(rescuer, `/assignments/${a.id}/status`, {
+      status: "DECLINED",
+    }).expect(400);
+    await post(rescuer, `/assignments/${a.id}/status`, {
+      status: "ACCEPTED",
+    }).expect(200);
+    await runEscalations();
+    expect(
+      (
+        await pool.query(
+          "SELECT outcome FROM escalation_executions WHERE incident_id=$1 ORDER BY stage DESC LIMIT 1",
+          [id],
+        )
+      ).rows[0].outcome,
+    ).toBe("ACCEPTED_AWAITING_DISPATCH");
+    await post(authority, `/assignments/${a.id}/status`, {
+      status: "CANCELLED",
+      note: "Test exercise ended by dispatcher",
+    }).expect(200);
+    expect(
+      (
+        await pool.query(
+          "SELECT outcome_note FROM incident_assignments WHERE id=$1",
+          [a.id],
+        )
+      ).rows[0].outcome_note,
+    ).toContain("exercise ended");
+    const second = (
+      await pool.query(
+        "INSERT INTO incident_assignments(incident_id,team_id) VALUES($1,$2) RETURNING id",
+        [id, teamId],
+      )
+    ).rows[0];
+    await post(rescuer, `/assignments/${second.id}/status`, {
+      status: "DECLINED",
+      note: "Required equipment is temporarily unavailable",
+    }).expect(200);
+    await rescuer.agent.get(`/api/v1/incidents/${id}`).expect(404);
+    await pool.query(
+      "INSERT INTO notification_jobs(incident_id,recipient_id,channel,status,dedupe_key) VALUES($1,$2,'IN_APP','AVAILABLE',$3)",
+      [id, rescuer.user.id, `eligible:${randomUUID()}`],
+    );
+    const inbox = await rescuer.agent.get("/api/v1/notifications").expect(200);
+    expect(
+      inbox.body.items.find((n: any) => n.incident_id === id).can_open,
+    ).toBe(false);
+  });
+  it("simulates queued external notifications without calling SNS or SES and never labels them delivered", async () => {
+    const previous = config.NOTIFICATION_TRANSPORT;
+    const sns = vi.spyOn(SNSClient.prototype, "send"),
+      ses = vi.spyOn(SESv2Client.prototype, "send");
+    try {
+      config.NOTIFICATION_TRANSPORT = "simulator";
+      await pool.query(
+        "UPDATE notification_jobs SET status='FAILED' WHERE channel IN('SMS','EMAIL') AND status='PENDING'",
+      );
+      await report();
+      await queueExternalNotifications();
+      for (let round = 0; round < 20; round++) {
+        await sendNotifications();
+        if (
+          !(
+            await pool.query(
+              "SELECT 1 FROM notification_jobs WHERE channel IN('SMS','EMAIL') AND status='PENDING' LIMIT 1",
+            )
+          ).rowCount
+        )
+          break;
+      }
+      const r = await authority.agent.get("/api/v1/notifications").expect(200);
+      expect(r.body.items.some((n: any) => n.status === "SIMULATED")).toBe(
+        true,
+      );
+      expect(sns).not.toHaveBeenCalled();
+      expect(ses).not.toHaveBeenCalled();
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int n FROM notification_attempts WHERE outcome='SIMULATED'",
+          )
+        ).rows[0].n,
+      ).toBeGreaterThan(0);
+    } finally {
+      config.NOTIFICATION_TRANSPORT = previous;
+      sns.mockRestore();
+      ses.mockRestore();
+    }
+  });
+  it("records configured email provider acceptance distinctly from delivery using a stubbed SES contract", async () => {
+    const previous = config.EMAIL_FROM;
+    config.EMAIL_FROM = "verified@example.invalid";
+    const spy = vi
+      .spyOn(SESv2Client.prototype, "send")
+      .mockResolvedValue({ MessageId: "stub-email-message" } as never);
+    try {
+      await pool.query(
+        "UPDATE notification_jobs SET status='FAILED' WHERE channel='EMAIL' AND status='PENDING'",
+      );
+      await pool.query(
+        "UPDATE user_profiles SET email_notifications=true WHERE id=$1",
+        [authority.user.id],
+      );
+      const job = (
+        await pool.query(
+          "INSERT INTO notification_jobs(recipient_id,channel,dedupe_key) VALUES($1,'EMAIL',$2) RETURNING id",
+          [authority.user.id, randomUUID()],
+        )
+      ).rows[0];
+      await sendNotifications();
+      expect(
+        (
+          await pool.query("SELECT status FROM notification_jobs WHERE id=$1", [
+            job.id,
+          ])
+        ).rows[0].status,
+      ).toBe("SUBMITTED");
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      config.EMAIL_FROM = previous;
+      spy.mockRestore();
+      await pool.query(
+        "UPDATE user_profiles SET email_notifications=false WHERE id=$1",
+        [authority.user.id],
+      );
     }
   });
   it("renews local sessions and revokes suspended users immediately", async () => {

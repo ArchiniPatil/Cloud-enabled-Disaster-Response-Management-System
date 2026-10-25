@@ -1,6 +1,6 @@
 # API guide
 
-Base path: `/api/v1`. Machine-readable contract: [openapi.json](openapi.json). All application routes require the opaque `response_session` cookie. `GET /auth/me` returns the current profile and CSRF token. Mutations require `Origin` equal to `APP_ORIGIN` and `X-CSRF-Token`. The server does not accept client-supplied roles or owner IDs as authorization.
+Base path: `/api/v1`. Machine-readable contract: [openapi.json](openapi.json). All application routes require the opaque `response_session` cookie. `GET /auth/me` returns the current profile and CSRF token. Mutations require `Origin` equal to `APP_ORIGIN` (nonproduction demo mode additionally permits localhost/127.0.0.1 aliases with the same scheme and port) and `X-CSRF-Token`. The server does not accept client-supplied roles or owner IDs as authorization.
 
 Responses are JSON except OAuth redirects, SSE and map assets. Errors: `{ "error": { "code": "…", "message": "…" } }`; 400 validation, 401 session, 403 forbidden/CSRF, 404 inaccessible resource, 409 state/capacity conflict, 429 rate limit, 503 missing dependency. Unknown server errors do not expose stack traces. Lists default to 30, maximum 100 where pagination is supported; endpoints with fixed limits document that limit in code.
 
@@ -25,7 +25,7 @@ Responses are JSON except OAuth redirects, SSE and map assets. Errors: `{ "error
 {"kind":"EMERGENCY","category":"MEDICAL","severity":"HIGH","latitude":19.076,"longitude":72.8777,"description":"Controlled test only","address":""}
 ```
 
-Coordinates are validated; description/address are optional. Citizen reports are professional-risk **inputs**, not verified diagnoses. Repeated key + identical body returns the same report. Changed body + same key returns 409. `GET /incidents?limit=30&offset=0` is scoped; `GET /incidents/{id}` includes history and assignments.
+Coordinates are validated; description/address are optional. Citizen reports are professional-risk **inputs**, not verified diagnoses. Repeated key + identical body returns the same report. Changed body + same key returns 409. `GET /incidents?limit=30&offset=0` is scoped; `GET /incidents/{id}` includes history, assignments and immutable supplements. Optional report fields: `peopleAffected` integer 1–1,000,000, `hazards` up to 1,000 characters, and `locationAccuracyM` 0–100,000 metres.
 
 `POST /incidents/{id}/status` accepts `{status,note?}` and checks state rules. Operational milestones come from assignments, not arbitrary status writes. Citizens can cancel only unacknowledged reports. Authorities can acknowledge, verify, flag duplicates, reopen and resolve only according to the state machine.
 
@@ -35,7 +35,7 @@ Coordinates are validated; description/address are optional. Citizen reports are
 - `POST /incidents/{id}/escalate`: durable manual review.
 - `POST /incidents/{id}/publish`: `{published:boolean}`, sensitive categories prohibited.
 - `POST /assignments`: `{incidentId,teamId}` plus `Idempotency-Key`; authority/admin only, capacity locked.
-- `POST /assignments/{id}/status`: `{status}`; responders accept/decline and report progress; only dispatchers authorize dispatch or cancel.
+- `POST /assignments/{id}/status`: `{status,note?}`; note length 5–1,000 is required for DECLINED, CANCELLED and COMPLETED; responders accept/decline and report progress; only dispatchers authorize dispatch or cancel.
 
 Incident states: SUBMITTED → ACKNOWLEDGED → DISPATCHED → TEAM_EN_ROUTE → TEAM_ON_SCENE → RESOLVED, with guarded verification/duplicate/cancel/unable/reopen alternatives. Assignment states: OFFERED → ACCEPTED → DISPATCHED → EN_ROUTE → ARRIVED → IN_PROGRESS → COMPLETED, with DECLINED/CANCELLED alternatives.
 
@@ -87,8 +87,20 @@ External integration failures never return fabricated success. Live AWS acceptan
 - `GET/POST /admin/organizations`; `PATCH /admin/organizations/{id}` with `{name,active}`. Deactivation rejects active assignments and stops the organization's location sessions.
 - `GET /admin/team-details`: team configuration, members and qualification expiry. `PATCH /admin/teams/{id}` accepts `{name,organizationId,vehicle,capacity,capabilities:[{capability,expiresAt}]}`. Active assignments block configuration changes. Expired qualifications prevent eligibility.
 - `POST /admin/users/{id}/resend-invitation`: only an active operational account with a pending Cognito temporary-password invitation. Accepted identities use password recovery.
-- `PATCH /admin/users/{id}/notification-preferences`: `{phone: E.164-or-null,smsEnabled:boolean}`; global sending remains separately disabled. Phone values are not written to audit details.
+- `PATCH /admin/users/{id}/notification-preferences`: `{phone: E.164-or-null,smsEnabled:boolean,emailEnabled:boolean}` (emailEnabled defaults to false); global sending remains separately disabled. Phone values are not written to audit details.
 - `GET /admin/notification-jobs`: latest 100 notification statuses and attempt outcomes, without destination phone numbers. Existing bounded retry endpoint accepts only definitive failures.
 - `PATCH /admin/resources/{id}/location`: `{latitude:number|null,longitude:number|null,address,publiclyListed}`. Coordinates must lie inside the resource jurisdiction; publishing without a location is rejected.
 
 SMS delivery ingestion is a restricted CloudWatch-to-Lambda entrypoint, not a public HTTP webhook. The academic deployment uses authenticated five-second polling of existing incident/tracking endpoints; the custom-domain reference retains SSE.
+
+## Operational dashboard and supplements
+
+- `GET /incidents`: `q` (literal ID/address substring, max 100), `category`, `severity`, `status`, `department` UUID, `hours` (1–2160), `view` (all/active/unassigned/overdue), `sort` (priority/recent), `limit` and `offset`. Returns authorized `items`, filtered `total` and `asOf`; each row includes location/address, overdue and assigned-team labels. Filters never widen the viewer's scope.
+- `GET /incidents/summary`: authorized overall `total`, `active`, `critical`, `unassigned`, `critical_unassigned`, `overdue`, `resolved` and timestamp. Counts are not computed from a limited page. The endpoint accepts the same scope-preserving filters; dashboard summary cards request it without queue filters.
+- `GET /incidents/activity`: latest 12 authorized status-history entries with timestamp.
+- `POST /incidents/{id}/updates`: strict `{body}` length 3–2,000 and required `Idempotency-Key`; users with current scoped incident access, open reports only. Persists immutable actor/time/body, audit and control-room notice. Detail returns these updates without exposing private user profiles.
+- Direct incident `RESOLVED` / `UNABLE_TO_RESPOND` writes require an outcome note of at least five characters, in addition to existing transition/assignment guards.
+- `GET /notifications`: own entries, actual unread count, notification type, `can_open` based on current incident scope and bounded attempt history. Read state is separate from response acknowledgement.
+- `GET /admin/health`: actual DB query success, identity configuration, worker heartbeat, notification transport and email configuration. Configured is not a live provider health test.
+
+Notification states include PENDING, AVAILABLE, SIMULATED, SUBMITTED, DELIVERED, FAILED and UNKNOWN. The development sink writes SIMULATED with `LOCAL_SINK_NO_EXTERNAL_DELIVERY`. SES has no delivery-receipt integration; successful submission remains SUBMITTED. Email and SMS share bounded retry/rate controls but independent provider configuration.

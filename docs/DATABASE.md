@@ -45,3 +45,7 @@ Location history defaults to 24 hours and is configurable from 1–168 hours. Th
 ## Management and operational extensions
 
 Migration 005 adds organization activation and an idempotent SMS receipt ledger keyed by provider message ID/outcome; existing team qualifications retain nullable expiry times. Migration 006 adds optional indexed geography, address and private-by-default public listing to resources. A published resource must have a location. Receipt reconciliation relates provider IDs to notification attempts without storing destination phone numbers.
+
+## Operational workflow migration 007
+
+Incidents store nullable `people_affected` and `location_accuracy_m`, bounded `hazards`, and a priority index. Eligibility subtracts incident uncertainty from the search radius and rejects uncertainty greater than the radius. `incident_updates` contains immutable, actor-attributed supplementary reports with an append-only trigger and restricted runtime grants. Assignments retain `outcome_note`; notification jobs support EMAIL and the distinct SIMULATED state; profiles have opt-in `email_notifications` defaulting to false. Existing records receive compatible empty/default values. Apply migrations through the normal setup/migrator, never by recreating a database with existing records.

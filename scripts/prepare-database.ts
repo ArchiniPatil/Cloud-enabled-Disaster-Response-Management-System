@@ -36,7 +36,7 @@ export async function prepareDatabase() {
       `ALTER ROLE response_app PASSWORD ${pg.escapeLiteral(credentials.password)}`,
     );
     await db.query(
-      "REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO response_app; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO response_app; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO response_app; REVOKE UPDATE,DELETE,TRUNCATE ON audit_events,incident_status_history,announcement_revisions FROM response_app; REVOKE INSERT,UPDATE,DELETE,TRUNCATE ON schema_migrations FROM response_app",
+      "REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO response_app; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO response_app; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO response_app; REVOKE UPDATE,DELETE,TRUNCATE ON audit_events,incident_status_history,announcement_revisions,incident_updates FROM response_app; REVOKE INSERT,UPDATE,DELETE,TRUNCATE ON schema_migrations FROM response_app",
     );
   });
 }

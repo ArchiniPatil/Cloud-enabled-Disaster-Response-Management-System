@@ -6,7 +6,7 @@ import { ZodError, z } from "zod";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { pool, transaction } from "./db.js";
-import { authRouter, authenticate, csrf } from "./auth.js";
+import { authRouter, authenticate, csrf, allowedOrigin } from "./auth.js";
 import { incidentRouter, assignmentsRouter } from "./incidents.js";
 import { operations } from "./operations.js";
 import { metrics } from "./metrics.js";
@@ -19,7 +19,7 @@ if (config.NODE_ENV === "production") app.set("trust proxy", 1);
 app.use(helmet());
 app.use((req, res, next) => {
   const origin = req.get("origin");
-  if (origin === config.APP_ORIGIN) {
+  if (origin && allowedOrigin(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Vary", "Origin");
@@ -51,16 +51,17 @@ app.get("/api/v1/health/ready", async (_req, res) => {
   }
 });
 app.use(
-  "/api/v1",
+  "/api/v1/auth",
   rateLimit({
     windowMs: 60000,
     limit: config.NODE_ENV === "test" ? 10000 : 300,
+    skip: (req) => !["/me", "/config"].includes(req.path),
     standardHeaders: "draft-8",
     legacyHeaders: false,
     message: {
       error: {
         code: "RATE_LIMITED",
-        message: "Too many requests. Please wait before retrying.",
+        message: "Too many session checks. Please wait before retrying.",
       },
     },
   }),
@@ -83,6 +84,22 @@ app.use(
   authRouter,
 );
 app.use("/api/v1", authenticate, csrf);
+app.use(
+  "/api/v1",
+  rateLimit({
+    windowMs: 60000,
+    keyGenerator: (req) => req.user.id,
+    limit: config.NODE_ENV === "test" ? 10000 : 300,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: {
+      error: {
+        code: "RATE_LIMITED",
+        message: "Too many requests. Please wait before retrying.",
+      },
+    },
+  }),
+);
 app.get("/api/v1/incidents/:id/events", async (req, res, next) => {
   try {
     const id = z.string().uuid().parse(req.params.id);

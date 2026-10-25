@@ -165,12 +165,36 @@ export async function authenticate(
     next(e);
   }
 }
+// Local fixture mode accepts the two explicit loopback aliases on the configured
+// port. Production/Cognito origin validation remains an exact origin match.
+export function allowedOrigin(origin?: string) {
+  if (origin === config.APP_ORIGIN) return true;
+  if (
+    config.AUTH_MODE !== "demo" ||
+    config.NODE_ENV === "production" ||
+    !origin
+  )
+    return false;
+  try {
+    const actual = new URL(origin),
+      expected = new URL(config.APP_ORIGIN);
+    return (
+      ["localhost", "127.0.0.1"].includes(actual.hostname) &&
+      ["localhost", "127.0.0.1"].includes(expected.hostname) &&
+      actual.protocol === expected.protocol &&
+      actual.port === expected.port &&
+      actual.origin === origin
+    );
+  } catch {
+    return false;
+  }
+}
 export function csrf(req: Request, _res: Response, next: NextFunction) {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
   const received = req.get("x-csrf-token") ?? "";
   if (
-    req.get("origin") !== config.APP_ORIGIN ||
-    received.length !== req.csrf.length ||
+    !allowedOrigin(req.get("origin")) ||
+    Buffer.byteLength(received) !== Buffer.byteLength(req.csrf) ||
     !timingSafeEqual(Buffer.from(received), Buffer.from(req.csrf))
   )
     return next(
@@ -290,7 +314,7 @@ authRouter.get("/callback", async (req, res) => {
 });
 authRouter.post("/demo", async (req, res) => {
   if (config.AUTH_MODE !== "demo") fail(404, "NOT_FOUND", "Not found");
-  if (req.get("origin") !== config.APP_ORIGIN)
+  if (!allowedOrigin(req.get("origin")))
     fail(403, "ORIGIN", "Invalid request origin");
   const email = z
     .enum([
@@ -306,7 +330,12 @@ authRouter.post("/demo", async (req, res) => {
       [email, "ACTIVE"],
     )
   ).rows[0];
-  if (!u) fail(503, "DEMO_UNSEEDED", "Run the demo seed");
+  if (!u)
+    fail(
+      503,
+      "DEMO_UNSEEDED",
+      "Local test accounts are not prepared. Run npm run setup:demo, then npm run dev:demo.",
+    );
   await newSession(res, u);
   res.json({ ok: true });
 });

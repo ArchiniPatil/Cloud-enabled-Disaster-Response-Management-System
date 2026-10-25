@@ -2,6 +2,15 @@ export let csrfToken = "";
 export function setCsrf(value: string) {
   csrfToken = value;
 }
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code: string,
+  ) {
+    super(message);
+  }
+}
 export async function api<T = any>(
   path: string,
   options: RequestInit = {},
@@ -23,8 +32,15 @@ export async function api<T = any>(
           : "The service returned an unexpected response. Please retry.",
     },
   }));
-  if (!response.ok)
-    throw new Error(data.error?.message ?? "Request could not be completed");
+  if (!response.ok) {
+    if (response.status === 401 && path !== "/auth/me")
+      window.dispatchEvent(new Event("response:unauthorized"));
+    throw new ApiError(
+      data.error?.message ?? "Request could not be completed",
+      response.status,
+      data.error?.code ?? "REQUEST_FAILED",
+    );
+  }
   return data;
 }
 export const post = (path: string, body: unknown = {}, key?: string) =>

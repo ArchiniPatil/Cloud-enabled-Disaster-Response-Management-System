@@ -62,7 +62,7 @@ management.get("/notification-jobs", async (_req, res) => {
   res.json({
     items: (
       await pool.query(
-        "SELECT n.id,n.channel,n.status,n.incident_id,n.created_at,coalesce((SELECT jsonb_agg(jsonb_build_object('outcome',a.outcome,'at',a.created_at) ORDER BY a.created_at) FROM notification_attempts a WHERE a.job_id=n.id),'[]') attempts FROM notification_jobs n ORDER BY n.created_at DESC LIMIT 100",
+        "SELECT n.id,n.channel,n.status,n.incident_id,n.created_at,(SELECT role FROM user_profiles u WHERE u.id=n.recipient_id) recipient_role,coalesce((SELECT jsonb_agg(jsonb_build_object('outcome',a.outcome,'at',a.created_at) ORDER BY a.created_at) FROM notification_attempts a WHERE a.job_id=n.id),'[]') attempts FROM notification_jobs n ORDER BY n.created_at DESC LIMIT 100",
       )
     ).rows,
   });
@@ -284,6 +284,7 @@ management.patch("/users/:id/notification-preferences", async (req, res) => {
         .regex(/^\+[1-9]\d{7,14}$/)
         .nullable(),
       smsEnabled: z.boolean(),
+      emailEnabled: z.boolean().default(false),
     })
     .strict()
     .parse(req.body);
@@ -297,8 +298,8 @@ management.patch("/users/:id/notification-preferences", async (req, res) => {
     if (
       !(
         await db.query(
-          "UPDATE user_profiles SET phone=$2,sms_enabled=$3 WHERE id=$1 AND role IN('AUTHORITY','RESCUER') RETURNING id",
-          [id, b.phone, b.smsEnabled],
+          "UPDATE user_profiles SET phone=$2,sms_enabled=$3,email_notifications=$4 WHERE id=$1 AND role IN('AUTHORITY','RESCUER') RETURNING id",
+          [id, b.phone, b.smsEnabled, b.emailEnabled],
         )
       ).rowCount
     )
@@ -306,6 +307,7 @@ management.patch("/users/:id/notification-preferences", async (req, res) => {
     // Audit the decision, never the phone number.
     await audit(db, req.user.id, "NOTIFICATION_PREFERENCES", "user", id, {
       smsEnabled: b.smsEnabled,
+      emailEnabled: b.emailEnabled,
       phoneConfigured: !!b.phone,
     });
   });

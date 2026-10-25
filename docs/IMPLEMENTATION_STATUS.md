@@ -1,8 +1,14 @@
 # Implementation status
 
-Updated 25 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
+Updated with the operational redesign on 25 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
 
 **Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; the user has now instructed deployment within the reviewed 24-hour/$30-credit scope. Approval and administrator/budget email are recorded. Live STS and the Free Tier API now confirm access and an ACTIVE FREE plan with $120 credits, expiring 10 April 2027. An AWS Organizations SCP explicitly denies CloudFormation inventory, blocking deployment. The cash-funded reference stays blocked.
+
+## Operational redesign
+
+See [REDESIGN_REPORT.md](REDESIGN_REPORT.md) for the complete ten-part handoff and [REDESIGN_AUDIT.md](REDESIGN_AUDIT.md) for the initial findings. The application now has role-specific dashboards, server-scoped totals/filtering/search, priority queues, recent activity and a synchronized optional map. Development access is separate from normal Cognito login. Reports include people/hazards/uncertainty, immutable supplements and required assignment outcome notes. Current-cycle acceptance pauses automatic escalation, with authorized manual override.
+
+Local SMS/email processing uses an explicitly labelled simulator with no external calls. The optional SES adapter records provider acceptance only; verified sender, opt-in and live validation remain required. Authentication now handles loopback aliases only in development, reports session-refresh errors, exits revoked sessions and applies protected API limits per user. Migration 007 preserves existing data.
 
 ## Completed implementation
 
@@ -29,11 +35,11 @@ Updated 25 October 2026. The repository was initially empty. **The core applicat
 | Check | Result | Scope |
 |---|---|---|
 | TypeScript, ESLint, production build | Passed | Local source and frontend/API bundles |
-| Unit + integration suite | 41 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
-| Playwright browser suite | 4 scenarios passed with SSE and polling | Citizen→authority→responder lifecycle, mobile persistence/GPS/layout, admin forms, organization/announcement/metrics workflows |
+| Unit + integration suite | 47 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
+| Playwright browser suite | 7 scenarios passed with SSE and polling | Full role lifecycle, mobile GPS/layout, admin management, queue filters/supplements, visible login errors, revocation and missing-provider states |
 | Docker image build + smoke | Passed | Node 22 container, health/readiness, cookie identity, database-backed scoped request |
 | CDK synthesis and security assertions | Passed | Local CloudFormation structure; no account API deployment |
-| Pipeline + analytics variant synthesis | Passed | Optional resources included, not provisioned |
+| SES + pipeline + analytics variant synthesis | Passed | Scoped SES worker sender grant and optional pipeline verified; resources not provisioned |
 | Frozen installation and repeatable migrations/seed | Passed | Existing local checkout and persistent database |
 | Production dependency audit | 0 known vulnerabilities reported | npm audit result at validation time; not a security certification |
 | AWS STS identity | Passed, 25 October 2026 | Supplied runtime credentials authenticate `project-admin` after omitting the nonexistent workspace profile |
@@ -46,7 +52,7 @@ See `TESTING.md` for commands and precise test boundaries. Test outcomes above d
 ## External prerequisites
 
 - AWS identity, Free-plan account state and the scoped deployment authorization have been verified. The Organizations policy denies CloudFormation inventory and EC2 availability-zone lookup; an authorized administrator/AWS Support must resolve it before the user deploys. No custom domain is required for the academic stack.
-- Current regional price/quota/service verification and explicit approval before provisioning. Current pricing/documentation requests were network-denied; planning cost ranges are unverified allowances.
+- Current regional price/quota/service verification and confirmation that the existing scoped authorization still covers the planned deployment. Current pricing/documentation requests were network-denied; planning cost ranges are unverified allowances.
 - Live Cognito managed registration/MFA/recovery/refresh/revocation tests, RDS restore drill, S3 IAM/finalization tests, real queue/Lambda/Scheduler behavior and Location routes/maps.
 - India/recipient-country SMS sender/template registration, verified test numbers, spend cap and approved IAM before SMS activation. No real SMS has been sent.
 - Amplify frontend publication and same-origin cookie/polling proxy validation for the default-hostname stack (DNS/certificate configuration applies only to the separate custom-domain reference). Source code has been published to the authorized GitHub repository; this does not deploy the application.

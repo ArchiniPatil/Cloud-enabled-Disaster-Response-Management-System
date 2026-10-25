@@ -10,6 +10,7 @@ Every resource below is **defined but not provisioned** unless explicitly marked
 | RDS PostgreSQL / PostGIS | Encrypted isolated DB, backups, TLS, private security groups | Migration custom resource creates PostGIS/schema/runtime role; unverified on live RDS |
 | Cognito | Unified managed login, public citizen registration, invitation API, TOTP, PKCE | Email setup, recovery and actual account flows unverified |
 | S3 | Private evidence, signed POST/download, retention, encryption | Finalized file copying and permissions require live test |
+| SES (optional) | Opt-in operational email sender and bounded attempts | Verified sender outside the stack; worker-only scoped IAM when emailFrom is configured; no delivery-receipt integration |
 | SNS | Incident topic and real Publish adapter | SMS adapter exists but disabled; no real messages sent |
 | SQS | Event queue, five-attempt redrive, 14-day DLQ | Local tests exercise consumer idempotence, not real queues |
 | Lambda | Partial-batch event handler, bounded scheduled worker, privileged migration function | Concurrency capped; error/backlog alarms |
@@ -38,3 +39,7 @@ Official references: [SNS SMS](https://docs.aws.amazon.com/sns/latest/dg/sns-mob
 The default-hostname academic template adds API Gateway HTTP API and VPC Link to the private ALB and uses Amplify's default hostname. Amazon Location includes an authenticated place-index search proxy as well as maps/routes. Optional CloudWatch SNS delivery subscriptions invoke a dedicated receipt Lambda. Glue/Athena describe incident, team and resource aggregate datasets. A separate identity-only template uses Cognito Lite with email/TOTP and no SMS. These are synthesized definitions; none has been provisioned or live-validated.
 
 For copyable PowerShell steps and a service-by-service acceptance table, see [AWS_WINDOWS_DEPLOYMENT.md](AWS_WINDOWS_DEPLOYMENT.md).
+
+## Optional operational email
+
+Set `AWS_EMAIL_FROM` to a sender email verified in SES in the deployment region before `cloud:plan` / `cloud:deploy`. This adds only the worker’s `ses:SendEmail` grant for that identity; it does not create/verify the SES identity. Confirm sandbox recipients, account eligibility and sending limits first, then enable individual operational users’ email preferences in Administration. Keep this configuration on subsequent deployments or the sender setting/grant is removed. Local fixture mode uses SIMULATED outcomes and makes no SES/SNS sends. See the Windows guide for commands and acceptance checks.

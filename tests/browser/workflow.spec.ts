@@ -2,9 +2,16 @@ import { test, expect, type BrowserContext } from "@playwright/test";
 async function login(context: BrowserContext, role: string) {
   const p = await context.newPage();
   await p.goto("/");
-  await p.getByRole("button", { name: `Demo ${role}`, exact: true }).click();
   await expect(
-    p.getByRole("heading", { name: /Help starts here|A clear view/ }),
+    p.getByRole("button", { name: /^Demo (Citizen|Authority|Rescuer|Admin)$/ }),
+  ).toHaveCount(0);
+  await p.getByRole("link", { name: /Open Development/ }).click();
+  await p.getByLabel("Demo role").selectOption(role.toLowerCase());
+  await p.getByRole("button", { name: "Continue with local account" }).click();
+  await expect(
+    p.getByRole("heading", {
+      name: /My reports and assistance|Operations overview|Responder workspace|Administration overview/,
+    }),
   ).toBeVisible();
   return p;
 }
@@ -68,6 +75,16 @@ test("citizen, dispatcher and responder complete a browser workflow", async ({
   await expect(citizen.getByText(/ETA unavailable/).first()).toBeVisible();
   for (const name of ["Arrived", "In Progress", "Completed"]) {
     await response.getByRole("button", { name, exact: true }).click();
+    if (name === "Completed") {
+      await response
+        .getByLabel("Reason or outcome")
+        .fill(
+          "Controlled exercise: assistance completed, no outstanding needs",
+        );
+      await response
+        .getByRole("button", { name: "Confirm Completed", exact: true })
+        .click();
+    }
   }
   await expect(
     citizen.locator(".page-head").getByText("Resolved", { exact: true }),
@@ -79,7 +96,9 @@ test("citizen, dispatcher and responder complete a browser workflow", async ({
   await citizen.getByRole("link", { name: /Profile & settings/ }).click();
   await citizen.getByRole("button", { name: "Log out" }).click();
   await expect(
-    citizen.getByRole("heading", { name: /A clearer path/ }),
+    citizen.getByRole("heading", {
+      name: /Disaster Response and Management System/,
+    }),
   ).toBeVisible();
   await citizenContext.close();
   await authorityContext.close();
@@ -96,7 +115,7 @@ test("mobile report form, persistent session and explicit integration failures",
   const p = await login(context, "Citizen");
   await p.reload();
   await expect(
-    p.getByRole("heading", { name: "Help starts here." }),
+    p.getByRole("heading", { name: "My reports and assistance" }),
   ).toBeVisible();
   await p.screenshot({
     path: "test-results/mobile-dashboard.png",
@@ -233,4 +252,152 @@ test("administrator manages an organization and authority corrects a notice and 
     authority.getByRole("heading", { name: "Team workload" }),
   ).toBeVisible();
   await authorityContext.close();
+});
+
+test("development access is separate and a failed session lookup is visible and retryable", async ({
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    p = await context.newPage();
+  await p.goto("/");
+  await expect(
+    p.getByRole("heading", { name: "Disaster Response and Management System" }),
+  ).toBeVisible();
+  await expect(
+    p.getByRole("button", { name: /^Demo (Citizen|Authority|Rescuer|Admin)$/ }),
+  ).toHaveCount(0);
+  await p.getByRole("link", { name: /Open Development/ }).click();
+  await p.route("**/api/v1/auth/me", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: { message: "Session service unavailable; retry connection" },
+      }),
+    }),
+  );
+  await p.getByRole("button", { name: "Continue with local account" }).click();
+  await expect(
+    p.getByRole("alert").filter({ hasText: "Session service unavailable" }),
+  ).toBeVisible();
+  await expect(
+    p.getByRole("button", { name: "Continue with local account" }),
+  ).toBeEnabled();
+  await p.unroute("**/api/v1/auth/me");
+  await p.getByRole("button", { name: "Continue with local account" }).click();
+  await expect(
+    p.getByRole("heading", { name: "My reports and assistance" }),
+  ).toBeVisible();
+  await p.goto("/admin");
+  await expect(
+    p.getByRole("heading", { name: "Access restricted" }),
+  ).toBeVisible();
+  await context.close();
+});
+
+test("server-driven queue filters, supplementary updates and empty states work with real local data", async ({
+  browser,
+}) => {
+  const citizenContext = await browser.newContext(),
+    authorityContext = await browser.newContext();
+  const citizen = await login(citizenContext, "Citizen"),
+    authority = await login(authorityContext, "Authority");
+  const marker = `UI controlled report ${Date.now()}`;
+  await citizen.getByRole("link", { name: "Need help", exact: true }).click();
+  await citizen
+    .getByRole("button", { name: "Medical emergency", exact: true })
+    .click();
+  await citizen.getByLabel("Latitude", { exact: true }).fill("19.076");
+  await citizen.getByLabel("Longitude", { exact: true }).fill("72.8777");
+  await citizen.getByLabel("Landmark or address").fill(marker);
+  await citizen.getByLabel("Estimated people affected").fill("2");
+  await citizen
+    .getByLabel("Immediate hazards")
+    .fill("Controlled exercise: smoke reported near gate");
+  await citizen.getByRole("button", { name: "Submit request" }).click();
+  await expect(citizen.getByText("Reported hazards:")).toBeVisible();
+  await citizen
+    .getByLabel("Add information")
+    .fill("Controlled exercise: use the east entrance");
+  await citizen
+    .getByRole("button", { name: "Add update", exact: true })
+    .click();
+  await expect(
+    citizen.getByText("Controlled exercise: use the east entrance", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await authority
+    .getByRole("textbox", { name: "Search incident ID or location" })
+    .fill(marker);
+  await authority.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(authority.locator(".queue-item")).toHaveCount(1);
+  await expect(authority.locator(".ops-stat.active strong")).toHaveText("1");
+  await authority.getByLabel("Severity", { exact: true }).selectOption("LOW");
+  await expect(
+    authority.getByRole("heading", { name: "No matching incidents" }),
+  ).toBeVisible();
+  await expect(authority.locator(".ops-stat.active strong")).toHaveText("0");
+  await authority.getByLabel("Severity", { exact: true }).selectOption("HIGH");
+  await expect(authority.locator(".queue-item")).toHaveCount(1);
+  await expect(
+    authority.getByRole("heading", { name: "Incident map", exact: true }),
+  ).toBeVisible();
+  await expect(
+    authority.getByText("Map unavailable", { exact: true }),
+  ).toBeVisible();
+  await authority.screenshot({
+    path: "test-results/operations-desktop.png",
+    fullPage: true,
+  });
+  await citizenContext.close();
+  await authorityContext.close();
+});
+
+test("revoked sessions leave the protected shell and normal login never falls back to fixtures", async ({
+  browser,
+}) => {
+  const context = await browser.newContext(),
+    p = await login(context, "Citizen");
+  await p.route("**/api/v1/incidents?**", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: { code: "SESSION_REVOKED", message: "Session revoked" },
+      }),
+    }),
+  );
+  await p.getByRole("button", { name: "Refresh dashboard" }).click();
+  await expect(
+    p.getByRole("heading", { name: "Disaster Response and Management System" }),
+  ).toBeVisible();
+  await expect(
+    p.getByText("Your session has ended or access was revoked.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await context.close();
+  const secure = await browser.newContext(),
+    loginPage = await secure.newPage();
+  await loginPage.route("**/api/v1/auth/config", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        mode: "cognito",
+        identityConfigured: false,
+        realtime: "poll",
+      }),
+    }),
+  );
+  await loginPage.goto("/");
+  await expect(
+    loginPage.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    loginPage.getByRole("link", { name: /Open Development/ }),
+  ).toHaveCount(0);
+  await loginPage.goto("/development");
+  await expect(loginPage.getByLabel("Demo role")).toHaveCount(0);
+  await secure.close();
 });

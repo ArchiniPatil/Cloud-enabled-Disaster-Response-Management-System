@@ -1,5 +1,35 @@
 # Test commands and actual results
 
+## Latest operational redesign verification
+
+Executed locally on Linux with Node 24, PostgreSQL 16/PostGIS 3.5 and Chromium; the container uses Node 22. No live provider acceptance or native Windows run is claimed.
+
+| Check | Actual result |
+|---|---|
+| `npm run setup:demo` | Passed: locked dependency install, preserved Docker volume, migrations through 007, repeatable fixture seed |
+| `npm run lint` | Passed |
+| `npm test` | **47 passed**, 2 files, none skipped |
+| `npm run test:e2e` | **7 passed** with SSE; **7 passed** with `REALTIME_TRANSPORT=poll` |
+| `npm run build` (includes TypeScript) | Passed; lazy MapLibre chunk size warning remains |
+| `npm run cloud:plan` + `npx tsx scripts/verify-infra.ts cdk.out/academic/DisasterResponse-academic.template.json` | Passed: offline default academic template/security checks |
+| Optional SES/pipeline/analytics offline synthesis | Passed with synthetic configuration; one `ses:SendEmail` grant, worker only, exact sender identity; pipeline present |
+| `DOCKER_CONFIG="$PWD/.local/docker-config" bash scripts/build-container.sh` | Passed with TLS verification intact; production install reported 0 vulnerabilities |
+| New container with explicit nonproduction fixture config + `SMOKE_API_ORIGIN=http://127.0.0.1:4001 npm run smoke:local` | Passed DB readiness, cookie sign-in, scoped list and logout; temporary container removed |
+| Native Windows and live Cognito/SES/SMS/S3/Location/hosted acceptance | Not run |
+
+New coverage verifies loopback-origin boundaries, missing fixture guidance, scoped aggregates beyond 30 rows, literal search/priority/filtering, hazard fields, immutable/idempotent supplements, closed-report rejection, outcome requirements, current-cycle acceptance pause, decline/access revocation and recipient-specific notification links. A simulator test drains bounded batches while asserting **zero SNS/SES sends**. A stubbed SES acceptance test verifies SUBMITTED rather than DELIVERED.
+
+The seven browser cases cover the citizen→authority→rescuer lifecycle and outcomes; mobile session/GPS/layout; admin scopes; organization/announcement/metrics workflows; separate development login and failed session refresh; queue filters/report hazards/supplements/empty map; and revoked sessions/unconfigured Cognito. Browser geolocation is controlled test data. Screenshots under ignored `test-results/` contain local fixture data, not actual emergencies.
+
+The first expanded browser run found three failures: shared-IP API throttling affected multi-role sessions, and a filter lacked an unambiguous accessible label. The implementation now limits authenticated API traffic per user, retains separate IP-based auth limits, and explicitly labels filters. The full suites passed after correction; no failing tests were deleted or skipped. Earlier compile/lint issues and the bounded simulator-test backlog were also resolved and rerun.
+
+Run the same checks from [START_HERE.md](../START_HERE.md). Stop an existing development server before browser testing so Playwright starts the intended isolated configuration. The standard test database must end in `_test`; browser tests write labelled fixtures to the development database. Never use an operational database.
+
+## Historical verification record
+
+The sections below describe earlier releases, including their then-current counts and startup behaviour. The latest results and explicit `setup:demo` / `dev:demo` commands above supersede them.
+
+
 Validation performed locally on 24 October 2026, using Node 24 on the host, Node 22 in the container, PostgreSQL 16 / PostGIS 3.5, and Chromium. No live AWS services were provisioned or used for acceptance testing.
 
 | Command / check | Actual outcome |

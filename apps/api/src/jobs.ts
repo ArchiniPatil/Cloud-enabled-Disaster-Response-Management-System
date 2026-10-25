@@ -1,3 +1,4 @@
+import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { SNSClient, PublishCommand } from "@aws-sdk/client-sns";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { config } from "./config.js";
@@ -7,7 +8,23 @@ import { notifyControl } from "./incidents.js";
 import { escalationNeeded } from "../../../packages/core/src/domain.js";
 import { s3 } from "./evidence.js";
 import { reconcileReceipt } from "./sms-receipts.js";
+const email = new SESv2Client({ region: config.AWS_REGION });
 const sns = new SNSClient({ region: config.AWS_REGION });
+export async function queueExternalNotifications(incidentId?: string) {
+  // Only messages already persisted for authorized in-app recipients are mirrored.
+  await pool.query(
+    `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key)
+    SELECT n.incident_id,n.recipient_id,channels.channel,lower(channels.channel)||':'||n.dedupe_key
+    FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id
+    CROSS JOIN (VALUES ('SMS'),('EMAIL')) channels(channel)
+    WHERE n.channel='IN_APP' AND u.status='ACTIVE' AND u.role IN('AUTHORITY','RESCUER')
+      AND n.created_at>now()-interval '1 day' AND ($2::uuid IS NULL OR n.incident_id=$2)
+      AND (($1 AND u.cognito_sub LIKE 'demo:%') OR (channels.channel='SMS' AND u.sms_enabled AND u.phone IS NOT NULL) OR (channels.channel='EMAIL' AND u.email_notifications))
+      AND NOT EXISTS(SELECT 1 FROM notification_jobs old WHERE old.dedupe_key=lower(channels.channel)||':'||n.dedupe_key)
+    ORDER BY n.created_at LIMIT 200 ON CONFLICT(dedupe_key) DO NOTHING`,
+    [config.NOTIFICATION_TRANSPORT === "simulator", incidentId ?? null],
+  );
+}
 export async function consumeEvent(event: {
   id: string;
   type: string;
@@ -25,15 +42,17 @@ export async function consumeEvent(event: {
       return;
     if (event.type === "INCIDENT_CREATED" && event.payload.incidentId) {
       await notifyControl(db, event.payload.incidentId, 0);
-      await db.query(
-        `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key) SELECT n.incident_id,n.recipient_id,'SMS','sms:'||n.dedupe_key FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE n.incident_id=$1 AND n.channel='IN_APP' AND u.sms_enabled AND u.phone IS NOT NULL ON CONFLICT DO NOTHING`,
-        [event.payload.incidentId],
-      );
     }
+    if (event.type === "STATUS_CHANGED" && event.payload.incidentId)
+      await db.query(
+        `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key,status) SELECT id,reporter_id,'IN_APP',$2,'AVAILABLE' FROM incidents WHERE id=$1 ON CONFLICT DO NOTHING`,
+        [event.payload.incidentId, `citizen-status:${event.id}`],
+      );
     await audit(db, null, "EVENT_CONSUMED", "event", event.id, {
       type: event.type,
     });
   });
+  await queueExternalNotifications(event.payload.incidentId);
 }
 export async function flushOutbox() {
   const rows = (
@@ -129,13 +148,19 @@ export async function runEscalations() {
           [i.id, i.response_cycle_started_at],
         )
       ).rowCount;
-      let outcome = "SATISFIED";
+      const accepted = !!(
+        await db.query(
+          "SELECT 1 FROM incident_assignments WHERE incident_id=$1 AND updated_at>=$2 AND status='ACCEPTED'",
+          [i.id, i.response_cycle_started_at],
+        )
+      ).rowCount;
+      let outcome = accepted ? "ACCEPTED_AWAITING_DISPATCH" : "SATISFIED";
       if (
         (e.force_review &&
           !["RESOLVED", "CANCELLED", "DUPLICATE", "UNABLE_TO_RESPOND"].includes(
             i.status,
           )) ||
-        escalationNeeded(i.severity, i.status, dispatched)
+        (!accepted && escalationNeeded(i.severity, i.status, dispatched))
       ) {
         await notifyControl(db, i.id, e.stage);
         if (e.stage > 0)
@@ -174,10 +199,6 @@ export async function runEscalations() {
           );
           outcome += ":REGIONAL_REVIEW_REQUIRED";
         }
-        await db.query(
-          `INSERT INTO notification_jobs(incident_id,recipient_id,channel,dedupe_key) SELECT n.incident_id,n.recipient_id,'SMS','sms:'||n.dedupe_key FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE n.incident_id=$1 AND n.channel='IN_APP' AND u.sms_enabled AND u.phone IS NOT NULL ON CONFLICT DO NOTHING`,
-          [i.id],
-        );
       }
       await db.query(
         "UPDATE escalation_executions SET completed_at=now(),outcome=$2 WHERE id=$1",
@@ -190,12 +211,33 @@ export async function runEscalations() {
     });
 }
 export async function sendNotifications() {
-  if (config.SMS_ENABLED !== "true") return;
+  if (config.NOTIFICATION_TRANSPORT === "simulator") {
+    await transaction(async (db) => {
+      const jobs = (
+        await db.query(
+          "SELECT id FROM notification_jobs WHERE channel IN('SMS','EMAIL') AND status='PENDING' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 20",
+        )
+      ).rows;
+      for (const job of jobs) {
+        await db.query(
+          "UPDATE notification_jobs SET status='SIMULATED' WHERE id=$1",
+          [job.id],
+        );
+        await db.query(
+          "INSERT INTO notification_attempts(job_id,outcome,error_code) VALUES($1,'SIMULATED','LOCAL_SINK_NO_EXTERNAL_DELIVERY')",
+          [job.id],
+        );
+      }
+    });
+    return;
+  }
+  if (config.SMS_ENABLED !== "true" && !config.EMAIL_FROM) return;
   for (let n = 0; n < 20; n++) {
     const job = await transaction(async (db) => {
       const j = (
         await db.query(
-          `SELECT n.id,n.incident_id,u.phone FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE n.channel='SMS' AND n.status='PENDING' AND u.status='ACTIVE' AND u.sms_enabled AND (SELECT count(*) FROM notification_attempts a WHERE a.job_id=n.id AND a.outcome='SENDING')<3 AND (SELECT count(*) FROM notification_jobs recent WHERE recent.recipient_id=n.recipient_id AND recent.channel='SMS' AND recent.status IN('SUBMITTED','UNKNOWN') AND recent.created_at>now()-interval '1 hour')<6 ORDER BY n.created_at FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
+          `SELECT n.id,n.incident_id,n.channel,u.phone,u.email FROM notification_jobs n JOIN user_profiles u ON u.id=n.recipient_id WHERE ((n.channel='SMS' AND $1 AND u.sms_enabled) OR (n.channel='EMAIL' AND $2 AND u.email_notifications)) AND n.status='PENDING' AND u.status='ACTIVE' AND (SELECT count(*) FROM notification_attempts a WHERE a.job_id=n.id AND a.outcome='SENDING')<3 AND (SELECT count(*) FROM notification_jobs recent WHERE recent.recipient_id=n.recipient_id AND recent.channel=n.channel AND recent.status IN('SUBMITTED','UNKNOWN') AND recent.created_at>now()-interval '1 hour')<6 ORDER BY n.created_at FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
+          [config.SMS_ENABLED === "true", !!config.EMAIL_FROM],
         )
       ).rows[0];
       if (j) {
@@ -212,18 +254,36 @@ export async function sendNotifications() {
     });
     if (!job) break;
     try {
-      const result = await sns.send(
-        new PublishCommand({
-          PhoneNumber: job.phone,
-          Message: `Response coordination: incident ${job.incident_id}. Sign in to review. Notification is not dispatch confirmation.`,
-          MessageAttributes: {
-            "AWS.SNS.SMS.SMSType": {
-              DataType: "String",
-              StringValue: "Transactional",
-            },
-          },
-        }),
-      );
+      const result =
+        job.channel === "EMAIL"
+          ? await email.send(
+              new SendEmailCommand({
+                FromEmailAddress: config.EMAIL_FROM,
+                Destination: { ToAddresses: [job.email] },
+                Content: {
+                  Simple: {
+                    Subject: { Data: "Response coordination update" },
+                    Body: {
+                      Text: {
+                        Data: `Incident ${job.incident_id} has an update. Sign in at ${config.APP_ORIGIN} to review authorized details. This notification is not dispatch confirmation.`,
+                      },
+                    },
+                  },
+                },
+              }),
+            )
+          : await sns.send(
+              new PublishCommand({
+                PhoneNumber: job.phone,
+                Message: `Response coordination: incident ${job.incident_id}. Sign in to review. Notification is not dispatch confirmation.`,
+                MessageAttributes: {
+                  "AWS.SNS.SMS.SMSType": {
+                    DataType: "String",
+                    StringValue: "Transactional",
+                  },
+                },
+              }),
+            );
       await transaction(async (db) => {
         await db.query(
           "UPDATE notification_jobs SET status='SUBMITTED' WHERE id=$1",
@@ -233,7 +293,8 @@ export async function sendNotifications() {
           "INSERT INTO notification_attempts(job_id,provider_id,outcome) VALUES($1,$2,'SUBMITTED')",
           [job.id, result.MessageId],
         );
-        if (result.MessageId) await reconcileReceipt(db, result.MessageId);
+        if (job.channel === "SMS" && result.MessageId)
+          await reconcileReceipt(db, result.MessageId);
       });
     } catch (e) {
       const error = e as {
@@ -367,6 +428,7 @@ export async function tick() {
   );
   await flushOutbox();
   await runEscalations();
+  await queueExternalNotifications();
   await sendNotifications();
   await maintenance();
   await exportAnalytics();

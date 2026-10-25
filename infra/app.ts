@@ -438,6 +438,33 @@ export class ResponseStack extends Stack {
         },
       },
     });
+    const emailFrom = this.node.tryGetContext("emailFrom");
+    if (emailFrom) {
+      if (
+        typeof emailFrom !== "string" ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFrom)
+      )
+        throw new Error(
+          "emailFrom must be an existing verified SES email identity",
+        );
+      worker.addEnvironment("EMAIL_FROM", emailFrom);
+      service.taskDefinition.defaultContainer!.addEnvironment(
+        "EMAIL_FROM",
+        emailFrom,
+      );
+      worker.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["ses:SendEmail"],
+          resources: [
+            this.formatArn({
+              service: "ses",
+              resource: "identity",
+              resourceName: emailFrom,
+            }),
+          ],
+        }),
+      );
+    }
     const receiptGroups: string[] = String(
       this.node.tryGetContext("smsDeliveryLogs") ?? "",
     )
