@@ -1,12 +1,14 @@
 # Cloud-Enabled Disaster Response and Management System
 
+**Windows / VS Code handoff:** start with [START_HERE.md](START_HERE.md). It links the complete ZIP, local setup and [detailed PowerShell AWS instructions](docs/AWS_WINDOWS_DEPLOYMENT.md), including real accounts and every service integration.
+
 **Response** is a TypeScript disaster-coordination application with citizen reporting, department/jurisdiction-scoped dispatch, responder duty and location sessions, durable escalation, and accountable incident histories.
 
 This repository contains a working local workflow and AWS deployment definitions. **No AWS resources have been deployed.** Local demo identities are explicitly labeled and disabled in production. This is an academic coordination project, not a validated emergency-dispatch system. A submitted report does not guarantee acceptance by emergency services.
 
 **Normal authentication uses Amazon Cognito.** Citizens register and verify their email; administrators provision operational accounts; MFA, recovery and persistent sessions use the real identity provider. Sample identities are an explicit test-only option and never available in a Cognito deployment.
 
-**AWS deployment scope authorized on 25 October 2026:** a 24-hour window with a $30 credit allowance, $0 cash spend, no paid-plan upgrade and no domain purchase. Deployment still requires a usable AWS principal and the budget-alert email. No resources have been provisioned yet.
+**AWS deployment scope authorized on 25 October 2026:** a 24-hour window with a $30 credit allowance, $0 cash spend, no paid-plan upgrade and no domain purchase. AWS access and the budget email are configured; an explicit AWS Organizations policy deny currently blocks CloudFormation. No resources have been provisioned yet.
 
 ## AWS setup
 
@@ -64,7 +66,7 @@ bash scripts/build-container.sh
 npm audit --omit=dev --audit-level=high
 ```
 
-`npm test` uses a separate database ending in `_test` and deliberately resets **that test schema only**. `setup:demo` creates it. Browser tests create labeled controlled incidents in the development database. They do not send SMS. Install Chromium with `npx playwright install chromium` (Windows/macOS) or `npx playwright install --with-deps chromium` (Linux) if no system Chromium is available. The paid-deployment guard test in `npm test` and the optional container/cloud helper scripts still require Bash; on Windows, run that suite from Git Bash with Git for Windows on PATH. Bash is not needed to set up or run the app, the smoke check, or the browser tests.
+`npm test` uses a separate database ending in `_test` and deliberately resets **that test schema only**. `setup:demo` creates it. Browser tests create labeled controlled incidents in the development database. They do not send SMS. Install Chromium with `npx playwright install chromium` (Windows/macOS) or `npx playwright install --with-deps chromium` (Linux) if no system Chromium is available. The normal unit/integration suite, setup/startup and browser tests do not require Bash. Use `docker build -t response-local:verified .` for a normal Windows Docker build. Only the optional legacy custom-domain shell helpers require Bash; the Windows AWS guide uses Node and PowerShell.
 
 ## Optional paid AWS reference deployment
 

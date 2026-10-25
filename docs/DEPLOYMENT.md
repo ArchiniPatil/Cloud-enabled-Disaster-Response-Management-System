@@ -1,20 +1,14 @@
 # Deployment procedure
 
-## Academic deployment option
+## Current Windows handoff
 
-The user now reports $120 AWS Free-plan credits with 169 days remaining for an academic demonstration. Cash spend remains $0. Follow [ACADEMIC_DEMO.md](ACADEMIC_DEMO.md) for the new identity-only and default-AWS-hostname options, explicit credit-window approval, PowerShell commands and retained-resource cleanup. `npm run cloud:plan` is a local preview; The user has now instructed deployment within that reviewed scope; approval is recorded. AWS identity and the budget/admin email remain required before execution. The custom-domain procedure below is a separate reference deployment.
+Use [AWS_WINDOWS_DEPLOYMENT.md](AWS_WINDOWS_DEPLOYMENT.md) for the complete default-hostname hosted deployment from PowerShell, real account bootstrap, frontend publication, optional pipeline, service verification and cleanup. It supersedes older missing-credential instructions. AWS identity and Free-plan credits were verified on 25 October 2026; CloudFormation remains blocked by an explicit Organizations SCP deny. No application resources have been provisioned.
 
-## Current $0 evaluation path
+The user will perform deployment personally. The scoped credit-funded plan remains 24 hours / $30 credits, $0 cash and no upgrade/domain/SMS activation. The account-level policy must still be resolved on the laptop. `config/academic-deployment.json` and the `cloud:*` commands apply to this default-hostname option.
 
-The user selected a $0 budget and no custom domain. For explicit fixture tests, run `npm run setup:demo` followed by `npm run dev:demo`. Normal `setup:local` / `dev:local` require real Cognito accounts. Do not bootstrap CDK, run a cloud deployment, or enable SMS for this evaluation path. `config/deployment-policy.json` blocks the paid deploy command before any AWS call, even if an old approval environment variable is present. Local synthesis remains available for the academic architecture review.
+## Custom-domain reference deployment
 
-The stack below is a future paid reference deployment; its domain/certificate requirements do not apply to the selected local evaluation. The default-hostname academic design is now implemented and locally synthesized, and still requires its separate cost/identity review and live validation.
-
-## Status and approvals
-
-No AWS resources or public URLs exist for this project. `aws sts get-caller-identity --region ap-south-1` failed because the environment's configured identity profile was unavailable. Configure an approved temporary role / IAM Identity Center profile through environment settings, then repeat this read-only check. Never paste credentials into chat or source.
-
-Before provisioning: review `COST_ESTIMATE.md`, verify live prices and service availability, inspect existing account resources, obtain explicit billable-resource approval, approve the intended stack/environment, and have a cleanup owner. CDK synthesis is not deployment or an account-specific permission check.
+The remaining instructions describe the separate paid `DisasterResponse-dev` / `DisasterResponse-prod` reference. They are not the PowerShell academic path. Its policy remains disabled in `config/deployment-policy.json`; do not run its cleanup script against the academic stack. The following commands require Bash and an existing domain/certificate.
 
 ## Preflight
 

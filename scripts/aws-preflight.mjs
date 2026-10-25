@@ -1,16 +1,19 @@
 import { spawnSync } from "node:child_process";
 
+process.env.AWS_PAGER = "";
 const region = process.env.AWS_REGION || "ap-south-1";
 function read(args) {
   const result = spawnSync(
     "aws",
-    [...args, "--region", region, "--output", "json", "--no-cli-pager"],
+    [...args, "--region", region, "--output", "json"],
     { encoding: "utf8", timeout: 30000 },
   );
   if (result.error || result.status !== 0) {
     console.error(
       "AWS read-only check failed. Check AWS CLI installation, the selected profile, and its permissions. Configure credentials locally; never paste them into chat.",
     );
+    if (result.error) console.error(result.error.message);
+    if (result.stderr?.trim()) console.error(result.stderr.trim());
     process.exit(1);
   }
   return JSON.parse(result.stdout);

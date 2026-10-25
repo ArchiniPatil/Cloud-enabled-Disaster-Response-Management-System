@@ -121,13 +121,17 @@ describe("Cognito token validation contract (local signing key, not live Cognito
 
 describe("zero-budget deployment policy", () => {
   it("blocks paid deployment before credentials or AWS calls even with an old approval variable", () => {
-    const result = spawnSync("bash", ["scripts/deploy.sh", "deploy"], {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        APPROVE_BILLABLE_DEPLOYMENT: "I_REVIEWED_COSTS_AND_APPROVE",
+    const result = spawnSync(
+      process.execPath,
+      ["scripts/check-paid-deployment.mjs"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          APPROVE_BILLABLE_DEPLOYMENT: "I_REVIEWED_COSTS_AND_APPROVE",
+        },
       },
-    });
+    );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("approved AWS budget is $0");
   });

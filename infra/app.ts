@@ -49,10 +49,13 @@ import { readdirSync, readFileSync } from "node:fs";
 export class ResponseStack extends Stack {
   constructor(scope: Construct, id: string) {
     super(scope, id, {
-      env: {
-        region: process.env.CDK_DEFAULT_REGION ?? "ap-south-1",
-        account: process.env.CDK_DEFAULT_ACCOUNT,
-      },
+      env:
+        scope.node.tryGetContext("offlinePreview") === "true"
+          ? undefined
+          : {
+              region: process.env.CDK_DEFAULT_REGION ?? "ap-south-1",
+              account: process.env.CDK_DEFAULT_ACCOUNT,
+            },
     });
     const stage = this.node.tryGetContext("stage") ?? "dev";
     if (!["dev", "prod"].includes(stage))
@@ -682,11 +685,7 @@ export class ResponseStack extends Stack {
       }),
     );
     new logs.MetricFilter(this, "NotificationFailureMetric", {
-      logGroup: logs.LogGroup.fromLogGroupName(
-        this,
-        "WorkerLogRef",
-        `/aws/lambda/${worker.functionName}`,
-      ),
+      logGroup: worker.logGroup,
       filterPattern: logs.FilterPattern.stringValue(
         "$.event",
         "=",

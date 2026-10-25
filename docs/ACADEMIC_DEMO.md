@@ -1,5 +1,7 @@
 # Academic demonstration and AWS handoff
 
+For the current step-by-step Windows handoff, use [AWS_WINDOWS_DEPLOYMENT.md](AWS_WINDOWS_DEPLOYMENT.md). The user will deploy personally.
+
 ## Current status and account constraint
 
 On 25 October 2026, live AWS STS authenticated the configured `project-admin` user. The Free Tier API confirmed an **ACTIVE FREE plan, $120 remaining credits, and expiration on 10 April 2027**. The cash budget remains **$0**. Deployment is authorized within the recorded 24-hour/$30-credit scope; the administrator/budget email is configured. No account upgrade, SMS sending or provisioning has been performed.
@@ -69,7 +71,7 @@ Local Cognito requires AWS CLI/SDK access for administrative invitation and boot
 
 ## Option B: the default-hostname AWS deployment
 
-Preview the exact academic template and check its security properties:
+Preview the environment-agnostic academic template and check its security properties (actual deployment resolves the account and availability zones):
 
 ```powershell
 npm run cloud:plan

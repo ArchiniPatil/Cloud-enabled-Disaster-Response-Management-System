@@ -64,6 +64,17 @@ if (of("AWS::ApiGatewayV2::Api").length) {
     ),
   );
 assert(resources.some((r) => r.Type === "AWS::CloudFormation::CustomResource"));
+// A metric filter must reference the configured custom worker log group, not
+// an assumed /aws/lambda/<name> group that CloudFormation never creates.
+const worker = Object.entries(template.Resources).find(
+  ([id, resource]: [string, any]) =>
+    id.startsWith("Worker") && resource.Type === "AWS::Lambda::Function",
+)?.[1] as any;
+assert(worker?.Properties.LoggingConfig?.LogGroup);
+assert.deepEqual(
+  of("AWS::Logs::MetricFilter")[0].Properties.LogGroupName,
+  worker.Properties.LoggingConfig.LogGroup,
+);
 assert(of("AWS::Budgets::Budget").length === 1);
 for (const o of Object.values(template.Outputs ?? {}) as any[])
   assert(!/SecretString|password|access.key/i.test(JSON.stringify(o.Value)));

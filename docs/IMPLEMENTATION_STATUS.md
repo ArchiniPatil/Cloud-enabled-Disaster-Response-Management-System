@@ -45,11 +45,11 @@ See `TESTING.md` for commands and precise test boundaries. Test outcomes above d
 
 ## External prerequisites
 
-- Secure AWS role/profile configuration; a successful read-only STS check; a reviewed credit allowance/window with explicit approval for the academic plan, or a separately approved cash budget for the paid reference stack. No domain is required for current local evaluation.
+- AWS identity, Free-plan account state and the scoped deployment authorization have been verified. The Organizations policy denies CloudFormation inventory and EC2 availability-zone lookup; an authorized administrator/AWS Support must resolve it before the user deploys. No custom domain is required for the academic stack.
 - Current regional price/quota/service verification and explicit approval before provisioning. Current pricing/documentation requests were network-denied; planning cost ranges are unverified allowances.
 - Live Cognito managed registration/MFA/recovery/refresh/revocation tests, RDS restore drill, S3 IAM/finalization tests, real queue/Lambda/Scheduler behavior and Location routes/maps.
 - India/recipient-country SMS sender/template registration, verified test numbers, spend cap and approved IAM before SMS activation. No real SMS has been sent.
-- Amplify source/manual publication, DNS/certificate setup, same-origin cookie/SSE proxy validation. Source code has been published to the authorized GitHub repository; this does not deploy the application.
+- Amplify frontend publication and same-origin cookie/polling proxy validation for the default-hostname stack (DNS/certificate configuration applies only to the separate custom-domain reference). Source code has been published to the authorized GitHub repository; this does not deploy the application.
 
 ## Added academic demonstration capabilities
 
@@ -77,3 +77,10 @@ The environment draft contains tested `install_script` and `start_skill` instruc
 ## Real-account default (25 October 2026)
 
 Normal `setup:local` / `dev:local` now require actual Cognito configuration and an unseeded real-account database. Fixture accounts are only available through explicit `setup:demo` / `dev:demo` commands using `.env.demo`; existing legacy `.env` files are not silently reused. `.env.example` is Cognito-based. AWS deployment approval is recorded for the previously reviewed scope. AWS operator authentication and Free Tier account checks now pass; application authentication remains untested. CloudFormation inventory is blocked by organization policy, so no deployment has occurred.
+
+
+## VS Code handoff
+
+The user elected to deploy personally. `START_HERE.md` and `AWS_WINDOWS_DEPLOYMENT.md` provide the complete Windows handoff, with VS Code tasks, a PowerShell frontend publisher, optional pipeline configuration and service-by-service acceptance. The normal test suite now uses a portable Node deployment-policy guard. A CloudWatch metric-log reference was corrected and asserted in synthesis. The build and 41 local tests pass; no native Windows or live AWS integration success is claimed.
+
+`cloud:plan` is now an offline environment-agnostic preview so account lookup restrictions do not prevent source review. Deployment performs real account-specific resolution and remains blocked by the SCP. The optional pipeline still needs an authorized GitHub connection and deploys only the backend. SMS is disabled; country-specific registered sender/entity/template attributes still require adapter configuration before activation. Incident aggregate exports do not currently include geographic grouping. See the handoff guide for these boundaries and the corresponding external work.

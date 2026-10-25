@@ -50,7 +50,7 @@ Docker initially lacked the managed proxy DNS mapping and CA trust context. `bui
 
 The reported Windows failure occurred before installation: PowerShell resolved `bash` to an unavailable WSL shell. `setup:local` now runs a Node script with no shell-specific environment assignments. It checks Docker, installs dependencies into the existing checkout, preserves an existing `.env`, creates it when absent, and prepares the demo and test databases. The development launcher invokes npm through Node without shell quoting and provides a useful message when `.env` is missing. Playwright passes `AUTH_MODE` through its environment configuration instead of POSIX command syntax.
 
-For this correction, setup, lint, typechecking, development startup, the database/session smoke check, and all three browser scenarios (including automatic server startup) passed on Linux. A missing-environment check from a directory containing spaces also passed. Native Windows execution remains unverified in this environment. The full unit/integration suite still contains a Bash-based paid-deployment guard test; Windows users need Git Bash for that suite, but not for local app setup/startup or browser tests.
+For this correction, setup, lint, typechecking, development startup, the database/session smoke check, and all three browser scenarios (including automatic server startup) passed on Linux. A missing-environment check from a directory containing spaces also passed. Native Windows execution remains unverified in this environment. At that point the paid-deployment guard test still used Bash; the Windows handoff below replaces it with a shared Node guard.
 
 ## Remaining acceptance gates
 
@@ -62,7 +62,7 @@ The new tests exercise PKCE login/registration/recovery redirects without contac
 
 The test database now runs the actual ordered migration runner, including management/receipt and resource-location migrations. An added analytics test exposed a reserved SQL alias in the previous export path; it was corrected and the test rerun. The initial integration run encountered a stopped local database; Docker was started before rerunning successfully.
 
-Native Windows remains unverified here. Bash is still required for the older paid-deployment script test; local app/Cognito startup and the new academic helpers run through Node. The academic template's internal ALB/HTTPS gateway, database privacy, MFA and no-secret-output checks are local template assertions, not a deployed networking test.
+Native Windows remains unverified here. The Windows handoff removes the test suite's Bash dependency; the optional legacy custom-domain deploy/cleanup scripts still use Bash. The academic template's internal ALB/HTTPS gateway, database privacy, MFA and no-secret-output checks are local template assertions, not a deployed networking test.
 
 Release verification on 25 October 2026: the updated Node 22 container built successfully and passed database readiness, cookie sign-in, scoped incident listing and logout. The first smoke request arrived before container startup completed; it passed after the startup event. The managed build used a writable ignored Docker configuration directory because the default home directory was read-only. No application TLS checks were disabled.
 
@@ -78,3 +78,15 @@ Default-authentication checks now verify that normal startup cannot enter fixtur
 - `aws cloudformation list-stacks --region ap-south-1` failed with an explicit deny of `cloudformation:ListStacks` by Organizations SCP `p-7hvdp5n3`. Deployment did not proceed. IAM grants alone cannot override this restriction.
 - The installed CLI rejects `--no-cli-pager`; read-only checks were rerun without that option. Cloud deployment requires a compatible AWS CLI before using the existing helper.
 - No resources were provisioned, no account plan was changed, and no application/provider acceptance tests were claimed. No credentials were printed or committed.
+
+
+## VS Code / Windows source handoff — 25 October 2026
+
+- Added root `START_HERE.md`, VS Code tasks, and `docs/AWS_WINDOWS_DEPLOYMENT.md` covering installation, real Cognito accounts, every service, full hosted deployment, frontend upload, first administrator/invitations, optional pipeline, live acceptance and cleanup.
+- Replaced the Bash-dependent paid-policy unit test with a Node policy guard shared by the legacy deploy script. The full suite passed: **41 tests, 2 files** on Linux. Native Windows execution is still pending on the user's computer.
+- ESLint, TypeScript and production build passed. The existing MapLibre bundle-size warning remains. No application/UI changes require a new browser acceptance claim; the prior four SSE/polling browser scenarios remain the recorded browser evidence.
+- Corrected CloudWatch's notification metric filter to reference the worker's configured log group. Added a synthesis assertion comparing the filter and Lambda log-group references; academic synthesis and assertions passed, both with and without the optional pipeline. The pipeline preview used a synthetic connection ARN solely for synthesis and included one CodeBuild project, one CodePipeline and three Glue tables; no connection or resource was created.
+- An initial account-bound preview was denied on `ec2:DescribeAvailabilityZones` by the same Organizations SCP. `cloud:plan` now explicitly synthesizes an environment-agnostic preview with lookups disabled; actual deployment still resolves the real account/region/AZs and requires permissions. The offline preview passed; it is not evidence that AWS permitted deployment.
+- AWS helpers disable the pager through `AWS_PAGER` rather than a CLI-version-specific flag and expose the actual preflight failure reason. The new frontend PowerShell helper verifies local outputs against the live stack, keeps signed upload URLs in memory and checks publication/readiness. Its live execution and native PowerShell behavior have not been tested in this Linux environment.
+- Added a portable official RDS CA download/parse helper; syntax checked, with no CA refresh/network download claimed. Optional CodeBuild now includes the production dependency audit.
+- No cloud resources, emails, invitations, SMS or deployments were created during this source handoff.

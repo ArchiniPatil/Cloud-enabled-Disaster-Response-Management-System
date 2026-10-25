@@ -4,14 +4,7 @@ cd "$(dirname "$0")/.."
 mode="${1:-preview}"
 if [[ "$mode" != preview && "$mode" != deploy ]]; then printf 'Usage: bash scripts/deploy.sh preview|deploy\n'; exit 2; fi
 if [ "$mode" = deploy ]; then
-  node --input-type=module - <<'JS'
-import {readFileSync} from 'node:fs';
-const policy=JSON.parse(readFileSync('config/deployment-policy.json','utf8'));
-if(!policy.allowPaidAwsDeployment || !(policy.monthlyBudgetUsd>0)) {
-  console.error('Deployment blocked: the approved AWS budget is $0. Use npm run dev:local. Free Tier does not guarantee the Fargate/ALB/NAT/RDS stack is free. A reviewed nonzero budget and explicit approval are required before changing deployment-policy.json.');
-  process.exit(1);
-}
-JS
+  node scripts/check-paid-deployment.mjs
 fi
 : "${AWS_REGION:=ap-south-1}"
 : "${STAGE:=dev}"

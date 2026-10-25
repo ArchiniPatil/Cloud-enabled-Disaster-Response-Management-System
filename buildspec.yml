@@ -11,6 +11,7 @@ phases:
       - docker compose exec -T db createdb -U response response_test
       - npm run lint
       - npm test
+      - npm audit --omit=dev --audit-level=high
       - npm run build
       - bash scripts/fetch-rds-ca.sh
       - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "${REPOSITORY_URI%/*}"
