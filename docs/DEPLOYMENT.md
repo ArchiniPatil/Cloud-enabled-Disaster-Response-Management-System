@@ -2,11 +2,11 @@
 
 ## Academic deployment option
 
-The user now reports $120 AWS Free-plan credits with 169 days remaining for an academic demonstration. Cash spend remains $0. Follow [ACADEMIC_DEMO.md](ACADEMIC_DEMO.md) for the new identity-only and default-AWS-hostname options, explicit credit-window approval, PowerShell commands and retained-resource cleanup. `npm run cloud:plan` is a local preview; `npm run cloud:deploy` remains blocked until that concrete plan is approved. The custom-domain procedure below is a separate reference deployment.
+The user now reports $120 AWS Free-plan credits with 169 days remaining for an academic demonstration. Cash spend remains $0. Follow [ACADEMIC_DEMO.md](ACADEMIC_DEMO.md) for the new identity-only and default-AWS-hostname options, explicit credit-window approval, PowerShell commands and retained-resource cleanup. `npm run cloud:plan` is a local preview; The user has now instructed deployment within that reviewed scope; approval is recorded. AWS identity and the budget/admin email remain required before execution. The custom-domain procedure below is a separate reference deployment.
 
 ## Current $0 evaluation path
 
-The user selected a $0 budget and no custom domain. Run `npm run setup:local` followed by `npm run dev:local`. Do not bootstrap CDK, run a cloud deployment, or enable SMS for this evaluation path. `config/deployment-policy.json` blocks the paid deploy command before any AWS call, even if an old approval environment variable is present. Local synthesis remains available for the academic architecture review.
+The user selected a $0 budget and no custom domain. For explicit fixture tests, run `npm run setup:demo` followed by `npm run dev:demo`. Normal `setup:local` / `dev:local` require real Cognito accounts. Do not bootstrap CDK, run a cloud deployment, or enable SMS for this evaluation path. `config/deployment-policy.json` blocks the paid deploy command before any AWS call, even if an old approval environment variable is present. Local synthesis remains available for the academic architecture review.
 
 The stack below is a future paid reference deployment; its domain/certificate requirements do not apply to the selected local evaluation. The default-hostname academic design is now implemented and locally synthesized, and still requires its separate cost/identity review and live validation.
 

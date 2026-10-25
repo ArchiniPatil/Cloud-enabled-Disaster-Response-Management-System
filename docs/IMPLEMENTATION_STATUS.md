@@ -2,7 +2,7 @@
 
 Updated 25 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
 
-**Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; provisioning remains disabled pending account verification and approval of that plan. Both deployment guards refuse unapproved provisioning.
+**Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; the user has now instructed deployment within the reviewed 24-hour/$30-credit scope. Approval is recorded; actual AWS identity, account checks and the administrator/budget email remain prerequisites. The cash-funded reference stays blocked.
 
 ## Completed implementation
 
@@ -29,7 +29,7 @@ Updated 25 October 2026. The repository was initially empty. **The core applicat
 | Check | Result | Scope |
 |---|---|---|
 | TypeScript, ESLint, production build | Passed | Local source and frontend/API bundles |
-| Unit + integration suite | 40 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
+| Unit + integration suite | 41 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
 | Playwright browser suite | 4 scenarios passed with SSE and polling | Citizen→authority→responder lifecycle, mobile persistence/GPS/layout, admin forms, organization/announcement/metrics workflows |
 | Docker image build + smoke | Passed | Node 22 container, health/readiness, cookie identity, database-backed scoped request |
 | CDK synthesis and security assertions | Passed | Local CloudFormation structure; no account API deployment |
@@ -71,3 +71,7 @@ See `TESTING.md` for commands and precise test boundaries. Test outcomes above d
 ## Reusable development environment
 
 The environment draft contains tested `install_script` and `start_skill` instructions, preserving the existing checkout, $0 AWS policy and no-domain evaluation path. Saving this draft is confirmed; environment publication and validation in a fresh restored task have not been performed. Current API/frontend/worker startup and the database heartbeat were verified.
+
+## Real-account default (25 October 2026)
+
+Normal `setup:local` / `dev:local` now require actual Cognito configuration and an unseeded real-account database. Fixture accounts are only available through explicit `setup:demo` / `dev:demo` commands using `.env.demo`; existing legacy `.env` files are not silently reused. `.env.example` is Cognito-based. AWS deployment approval is recorded for the previously reviewed scope. No live authentication or deployment success is claimed: this workspace still lacks usable AWS credentials and the budget email.

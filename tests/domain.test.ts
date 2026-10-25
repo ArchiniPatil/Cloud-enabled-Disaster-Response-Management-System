@@ -1,4 +1,14 @@
 import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  mkdirSync,
+  copyFileSync,
+  writeFileSync,
+  rmSync,
+  readFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   incidentSchema,
@@ -123,18 +133,47 @@ describe("zero-budget deployment policy", () => {
   });
 });
 
-it("blocks academic cloud provisioning until the specific credit-funded plan is approved", () => {
-  const result = spawnSync(
-    process.execPath,
-    ["scripts/academic-cloud.mjs", "deploy"],
-    {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        APPROVE_ACADEMIC_DEPLOYMENT: "REVIEWED_CREDIT_FUNDED_DEMO",
+it("blocks an unapproved credit-funded deployment before invoking AWS", () => {
+  const root = mkdtempSync(join(tmpdir(), "response-deployment-guard-"));
+  try {
+    mkdirSync(join(root, "scripts"));
+    mkdirSync(join(root, "config"));
+    copyFileSync(
+      "scripts/academic-cloud.mjs",
+      join(root, "scripts/academic-cloud.mjs"),
+    );
+    const policy = JSON.parse(
+      readFileSync("config/academic-deployment.json", "utf8"),
+    );
+    writeFileSync(
+      join(root, "config/academic-deployment.json"),
+      JSON.stringify({ ...policy, provisioningApproved: false }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [join(root, "scripts/academic-cloud.mjs"), "deploy"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          APPROVE_ACADEMIC_DEPLOYMENT: "REVIEWED_CREDIT_FUNDED_DEMO",
+        },
       },
-    },
-  );
-  expect(result.status).toBe(1);
-  expect(result.stderr).toContain("Deployment blocked");
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Deployment blocked");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("defaults to Cognito and keeps fixture startup explicitly opt-in", () => {
+  const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+  expect(readFileSync(".env.example", "utf8")).toContain("AUTH_MODE=cognito");
+  expect(manifest.scripts["dev:demo"]).toContain("--demo");
+  const result = spawnSync(process.execPath, ["scripts/dev-local.mjs"], {
+    encoding: "utf8",
+    env: { ...process.env, AUTH_MODE: "demo" },
+  });
+  expect(result.status).not.toBe(0);
 });

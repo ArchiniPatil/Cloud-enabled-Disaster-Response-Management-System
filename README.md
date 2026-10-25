@@ -4,30 +4,39 @@
 
 This repository contains a working local workflow and AWS deployment definitions. **No AWS resources have been deployed.** Local demo identities are explicitly labeled and disabled in production. This is an academic coordination project, not a validated emergency-dispatch system. A submitted report does not guarantee acceptance by emergency services.
 
-**Current evaluation policy: $0 AWS budget, no custom domain.** The local workflow below creates no AWS resources. Paid deployment is blocked by `config/deployment-policy.json`; the CDK stack is a paid reference architecture, not a Free Tier guarantee.
+**Normal authentication uses Amazon Cognito.** Citizens register and verify their email; administrators provision operational accounts; MFA, recovery and persistent sessions use the real identity provider. Sample identities are an explicit test-only option and never available in a Cognito deployment.
 
-## Run locally
+**AWS deployment scope authorized on 25 October 2026:** a 24-hour window with a $30 credit allowance, $0 cash spend, no paid-plan upgrade and no domain purchase. Deployment still requires a usable AWS principal and the budget-alert email. No resources have been provisioned yet.
 
-Prerequisites: Node.js 22+, npm, and Docker with Compose. On Windows, start Docker Desktop with Linux containers and use PowerShell, Command Prompt, or Git Bash. The local setup and startup commands do not require Bash or a WSL shell. Extract the project ZIP and open a terminal inside the extracted project folder first. The environment was verified with Node 24 and PostgreSQL 16/PostGIS 3.5.
+## AWS setup
+
+Follow [the deployment guide](docs/ACADEMIC_DEMO.md) for the default-AWS-hostname stack, first administrator, operational invitations, frontend publication and cleanup. `npm run aws:preflight` performs read-only identity checks; `npm run cloud:plan` synthesizes the actual resource plan. The reviewed approval is recorded in `config/academic-deployment.json`; do not expand its scope or upgrade the account plan.
+
+## Run locally with real accounts
+
+Prerequisites: Node.js 22+, npm, Docker Desktop with Linux containers, and actual Cognito configuration. PowerShell, Command Prompt and Bash are supported.
 
 ```sh
+npm ci
+node scripts/configure-cognito.mjs .local/identity-outputs.json
 npm run setup:local
 npm run dev:local
 ```
 
-Wait for setup to print **Local setup complete** before starting the app. Keep the development terminal open while using the application. If setup fails, fix that error and rerun it before attempting startup or tests; setup installs the missing tools and creates `.env`.
+The configuration helper requires outputs from the actual identity-only stack, creates ignored `.env.cognito`, and generates the session-encryption key without printing it. The isolated `response_cognito` database contains reference categories but no sample users. Use the documented verified-email/TOTP first-admin bootstrap, then invite authority and rescuer accounts through Administration. The frontend uses port 5173 and the API port 4000. Keep the startup terminal open.
 
-The frontend listens on port **5173**, API on **4000**, and loopback-only PostGIS on **5432**. Use the clearly marked Demo Citizen, Authority, Rescuer, and Admin buttons. The local database password in `.env.example` is a disposable Docker development credential, never an AWS credential. Never expose this local configuration publicly.
+For hosted deployment, settings and secrets are injected by AWS; the container starts the built API with Cognito enforced. The default AWS frontend address is only available after a successful deployment and frontend publication.
 
-The startup command loads the ignored `.env`. For production, set `AUTH_MODE=cognito` and provide the CDK environment configuration. No production password is stored in PostgreSQL application tables.
+## Explicit local testing only
 
-## Updating an existing local installation
+These commands deliberately use `.env.demo`, seeded sample identities and an isolated local workflow. They are not the normal login/setup commands:
 
-Stop the development terminal with Ctrl+C. Replace the project source files with the new ZIP contents while keeping your existing `.env` and project-folder name. Do not delete Docker volumes. Run `npm run setup:local` to install the locked dependencies and apply additive migrations, then `npm run dev:local`.
+```sh
+npm run setup:demo
+npm run dev:demo
+```
 
-## Academic demonstration with real logins and AWS
-
-See [the academic demonstration guide](docs/ACADEMIC_DEMO.md) for the isolated Cognito login option, domain-free hosted architecture, reported $120-credit constraint, proposed cost/window review, first administrator, invitations, frontend publication and cleanup. Run `npm run aws:preflight` for read-only identity checks on the laptop where AWS credentials are configured; `npm run cloud:plan` only synthesizes the proposed stack. No AWS services have been provisioned.
+Existing `.env` files from older versions are preserved and no longer select the normal authentication mode. Do not delete Docker volumes when updating source. Use `setup:local` for actual Cognito accounts or `setup:demo` only for controlled fixture testing.
 
 ## Demonstrate the complete workflow
 
@@ -55,7 +64,7 @@ bash scripts/build-container.sh
 npm audit --omit=dev --audit-level=high
 ```
 
-`npm test` uses a separate database ending in `_test` and deliberately resets **that test schema only**. `setup:local` creates it. Browser tests create labeled controlled incidents in the development database. They do not send SMS. Install Chromium with `npx playwright install chromium` (Windows/macOS) or `npx playwright install --with-deps chromium` (Linux) if no system Chromium is available. The paid-deployment guard test in `npm test` and the optional container/cloud helper scripts still require Bash; on Windows, run that suite from Git Bash with Git for Windows on PATH. Bash is not needed to set up or run the app, the smoke check, or the browser tests.
+`npm test` uses a separate database ending in `_test` and deliberately resets **that test schema only**. `setup:demo` creates it. Browser tests create labeled controlled incidents in the development database. They do not send SMS. Install Chromium with `npx playwright install chromium` (Windows/macOS) or `npx playwright install --with-deps chromium` (Linux) if no system Chromium is available. The paid-deployment guard test in `npm test` and the optional container/cloud helper scripts still require Bash; on Windows, run that suite from Git Bash with Git for Windows on PATH. Bash is not needed to set up or run the app, the smoke check, or the browser tests.
 
 ## Optional paid AWS reference deployment
 

@@ -3,10 +3,12 @@
   "remainingCreditsReportedUsd": 120,
   "remainingDaysReported": 169,
   "cashBudgetUsd": 0,
-  "provisioningApproved": false,
-  "creditAllowanceUsd": 0,
+  "provisioningApproved": true,
+  "creditAllowanceUsd": 30,
   "maximumDemoHours": 24,
   "region": "ap-south-1",
   "upgradeAccountPlan": false,
-  "smsEnabled": false
+  "smsEnabled": false,
+  "approvalRecordedOn": "2026-10-25",
+  "approvalScope": "User instructed AWS setup after reviewing the 24-hour, $30-credit plan; no paid-plan upgrade or cash spend."
 }

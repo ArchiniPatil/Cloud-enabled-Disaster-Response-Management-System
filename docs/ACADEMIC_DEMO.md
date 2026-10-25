@@ -2,7 +2,7 @@
 
 ## Current status and account constraint
 
-The user reports an AWS **Free plan, $120 remaining credits, and 169 days remaining**. This is user-provided billing information, not an API-verified balance. The cash budget remains **$0**. No account-plan upgrade, SMS sending, or cloud provisioning has been performed or approved for a specific resource plan. Never treat service availability as proof that every feature or all usage is free.
+The user reports an AWS **Free plan, $120 remaining credits, and 169 days remaining**. This is user-provided billing information, not an API-verified balance. The cash budget remains **$0**. On 25 October 2026 the user instructed AWS setup after reviewing the 24-hour, $30-credit plan. This scope is now recorded as approved; AWS access and the alert/admin email remain missing. No account-plan upgrade, SMS sending or provisioning has been performed. Never treat service availability as proof that every feature or all usage is free.
 
 The cloud workspace still cannot authenticate to AWS. Credentials on the user's Windows laptop are not available to this workspace. Run read-only checks from the laptop with its configured AWS CLI; never share access keys, passwords, tokens or MFA codes.
 
@@ -22,7 +22,7 @@ The script prints the caller identity and project stack names, but does not crea
 
 The existing custom-domain reference and optional CodeBuild/CodePipeline definitions remain available. The academic hosted option uses default AWS HTTPS hostnames and does not require purchasing a domain. GitHub CI already verifies source. Connecting CodePipeline to a GitHub repository needs a separately authorized CodeConnections connection; it is not fabricated or auto-connected.
 
-### Proposed hosted plan for review, not authorization
+### Authorized hosted scope
 
 - Region: `ap-south-1`; one academic stack, `DisasterResponse-academic`.
 - One 0.25 vCPU / 0.5 GiB Fargate task (scaling ceiling two), one development RDS instance and 20 GiB initial storage, one NAT gateway, one internal ALB, and an API Gateway HTTP API/VPC Link.
@@ -32,13 +32,13 @@ The existing custom-domain reference and optional CodeBuild/CodePipeline definit
 - The budget resource tracks gross usage by excluding credits/refunds, and alerts at 80% of its $30 academic threshold. **It does not enforce a spending cap.** Project cost tags must be activated and billing data/notifications may be delayed.
 - `maximumDemoHours` is a planning constraint, not an automatic shutdown timer. Assign a cleanup owner and set a calendar reminder before deployment.
 
-The approved configuration stays disabled in `config/academic-deployment.json`. A reviewer must explicitly approve the resource plan, allowance and duration, verify that the account remains on the Free plan and the resources are available, and then record the approval. The older paid deployment guard remains disabled too.
+The approved configuration is recorded in `config/academic-deployment.json`: provisioning enabled within the 24-hour/$30-credit scope. Verify the AWS identity, account plan, service eligibility and remaining credits before deploying. Do not ask for the same approval again. The older cash-funded deployment guard remains disabled.
 
 ## Option A: real Cognito accounts with the application on your laptop
 
 This is separate from the four local demonstration buttons. It never stores passwords in the application database. Cognito handles registration, email verification, temporary invitation passwords, TOTP MFA and password recovery.
 
-1. Install dependencies with `npm run setup:local`. Keep Docker Desktop running.
+1. Install dependencies with `npm ci`. Keep Docker Desktop running.
 2. Preview the identity template: `npm run identity:synth`. This requires no cloud provisioning.
 3. After the identity-only plan and costs are approved, an operator can deploy `infra/identity.ts` using CDK and save outputs to `.local/identity-outputs.json`. CDK bootstrap is a separate provisioning step that must be included in the approval if the account is not already bootstrapped. Do not deploy both demonstration options unless both are needed and reviewed.
    After that explicit approval, the operator command is `npx cdk deploy ResponseAcademicIdentity --app "npx tsx infra/identity.ts" --output cdk.out/identity --outputs-file .local/identity-outputs.json --require-approval broadening`. Create `.local` first if necessary. This command creates AWS resources and is not part of the free local setup.
@@ -76,7 +76,7 @@ npx tsx scripts/verify-infra.ts cdk.out/academic/DisasterResponse-academic.templ
 
 No cloud resources are created by these commands. The academic template includes the aggregate analytics catalog. SMS is disabled. Provider delivery subscriptions are optional and require existing reviewed SNS log groups. The full infrastructure preview may take time to bundle assets.
 
-After explicit review/approval, an operator records `provisioningApproved: true` and the approved positive `creditAllowanceUsd` in `config/academic-deployment.json`, leaving `cashBudgetUsd: 0` and `upgradeAccountPlan: false`. Confirm the region's CDK bootstrap already exists, or obtain approval for it first. Then:
+The current user authorization records `provisioningApproved: true` and `creditAllowanceUsd: 30` in `config/academic-deployment.json`, with `cashBudgetUsd: 0` and `upgradeAccountPlan: false`. Confirm the region's CDK bootstrap already exists, or obtain approval for it first. Then:
 
 ```powershell
 $env:AWS_BUDGET_EMAIL = "your-budget-alert-email@example.com"

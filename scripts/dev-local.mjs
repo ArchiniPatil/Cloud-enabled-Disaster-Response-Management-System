@@ -2,15 +2,15 @@ import { loadEnvFile } from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 process.chdir(fileURLToPath(new URL("..", import.meta.url)));
-const cognito = process.argv.includes("--cognito");
+const cognito = !process.argv.includes("--demo");
 try {
-  loadEnvFile(cognito ? ".env.cognito" : ".env");
+  loadEnvFile(cognito ? ".env.cognito" : ".env.demo");
 } catch (error) {
   console.error(
     error.code === "ENOENT"
       ? cognito
         ? "Missing .env.cognito. Follow docs/ACADEMIC_DEMO.md to configure an existing Cognito pool."
-        : "Local setup is incomplete: .env is missing. Run npm run setup:local successfully before starting the app."
+        : "Test fixtures are not prepared. Run npm run setup:demo before npm run dev:demo."
       : `Cannot read .env: ${error.message}`,
   );
   process.exit(1);

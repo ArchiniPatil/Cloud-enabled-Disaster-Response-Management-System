@@ -6,7 +6,7 @@ Validation performed locally on 24 October 2026, using Node 24 on the host, Node
 |---|---|
 | `npm run lint` | Passed |
 | `npm run typecheck` / `npm run build` | Passed; MapLibre's lazy-loaded map bundle has a size warning |
-| `npm test` | **40 passed**, 2 files; no skipped tests |
+| `npm test` | **41 passed**, 2 files; no skipped tests |
 | `npm run test:e2e` | **4 passed** with SSE and polling; no skipped scenarios |
 | `npm run infra:check` | Synthesis plus private-network/encryption/MFA/queue/scheduler/budget/secret-output assertions passed |
 | `npm run infra:synth -- -c analytics=true -c pipeline=true --quiet` | Passed; optional resources defined only |
@@ -20,7 +20,7 @@ Validation performed locally on 24 October 2026, using Node 24 on the host, Node
 
 ## Isolation and safety
 
-`npm test` requires a database name ending in `_test`. It resets only that schema. `npm run setup:local` creates `response_test`; `TEST_DATABASE_URL` can select another explicitly named test database. Never point it at operational data. Unit/integration tests run sequentially because the integration file exercises a full workflow and carefully restores SDK/configuration stubs.
+`npm test` requires a database name ending in `_test`. It resets only that schema. `npm run setup:demo` creates `response_test`; `TEST_DATABASE_URL` can select another explicitly named test database. Never point it at operational data. Unit/integration tests run sequentially because the integration file exercises a full workflow and carefully restores SDK/configuration stubs.
 
 The default browser tests use the separate development database and clearly labeled demo accounts, create controlled incidents and administrative fixtures, and exercise mocked browser geolocation. They never claim physical GPS validation or real SMS delivery. Browser screenshots/traces are generated under ignored `test-results/`.
 
@@ -67,3 +67,5 @@ Native Windows remains unverified here. Bash is still required for the older pai
 Release verification on 25 October 2026: the updated Node 22 container built successfully and passed database readiness, cookie sign-in, scoped incident listing and logout. The first smoke request arrived before container startup completed; it passed after the startup event. The managed build used a writable ignored Docker configuration directory because the default home directory was read-only. No application TLS checks were disabled.
 
 The identity-only template, default-hostname academic template and custom-domain reference all synthesized successfully. The optional pipeline/analytics/SMS-receipt-subscription variant also synthesized, using a clearly synthetic account ID solely for the template test. The academic template includes three Glue tables; local security assertions passed for private database/tasks, internal ALB/VPC Link, MFA, redrive, scheduler, migrations, budget and secret-free outputs. These remain undeployed definitions.
+
+Default-authentication checks now verify that normal startup cannot enter fixture mode. The deployment-guard test uses an explicitly unapproved temporary configuration, so the real deployment authorization never causes tests to invoke AWS. Local fixture setup/startup commands are now `setup:demo` / `dev:demo`; normal startup uses Cognito.

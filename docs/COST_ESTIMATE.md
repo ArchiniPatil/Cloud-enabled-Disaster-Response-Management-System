@@ -1,6 +1,6 @@
 # Cost policy and reference architecture estimate
 
-**Active cash budget: $0.** User reports a Free plan with $120 credits and 169 days remaining. The separate proposed one-day academic window and $30 credit allowance are documented in [ACADEMIC_DEMO.md](ACADEMIC_DEMO.md); they are not yet approved or verified against live prices. Development/evaluation uses local Docker/PostGIS and localhost URLs. No AWS resources have been created. No domain purchase is required. The deployment policy blocks the paid reference stack. Free Tier credits, eligibility and limits are account-specific and do not guarantee a $0 ongoing bill; Fargate, ALB, NAT and managed PostGIS/RDS cannot all be assumed always-free.
+**Active cash budget: $0.** User reports a Free plan with $120 credits and 169 days remaining. The separate proposed one-day academic window and $30 credit allowance are documented in [ACADEMIC_DEMO.md](ACADEMIC_DEMO.md); the user has now authorized this scope. Live regional prices and account eligibility still require verification. Development/evaluation uses local Docker/PostGIS and localhost URLs. No AWS resources have been created. No domain purchase is required. The deployment policy blocks the paid reference stack. Free Tier credits, eligibility and limits are account-specific and do not guarantee a $0 ongoing bill; Fargate, ALB, NAT and managed PostGIS/RDS cannot all be assumed always-free.
 
 The estimates below describe a future paid reference deployment only. They are not the selected plan or authorized spend.
 
