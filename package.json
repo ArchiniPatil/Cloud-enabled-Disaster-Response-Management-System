@@ -36,7 +36,8 @@
     "cloud:inventory": "node scripts/academic-cloud.mjs inventory",
     "setup:demo": "node scripts/local-setup.mjs --demo",
     "dev:demo": "node scripts/dev-local.mjs --demo",
-    "start": "node dist/api/server.js"
+    "start": "node dist/api/server.js",
+    "doctor:local": "node scripts/doctor-local.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1155.0",

@@ -1,3 +1,4 @@
+import { tokenColor } from "./visual-tokens";
 import { useEffect, useRef, useState } from "react";
 import type * as MapLibre from "maplibre-gl";
 import { MapPin } from "lucide-react";
@@ -83,7 +84,7 @@ export function OperationsMap({
       }
       for (const r of resources.data?.items ?? []) {
         markers.current.push(
-          new lib.Marker({ color: "#15755a", scale: 0.7 })
+          new lib.Marker({ color: tokenColor("teal"), scale: 0.7 })
             .setLngLat([r.longitude, r.latitude])
             .setPopup(new lib.Popup().setText(`${r.name} · ${label(r.status)}`))
             .addTo(map.current),
@@ -124,7 +125,7 @@ export function OperationsMap({
           )
             continue;
           activeMarkers.push(
-            new lib.Marker({ color: "#2563eb" })
+            new lib.Marker({ color: tokenColor("info") })
               .setLngLat([team.longitude, team.latitude])
               .setPopup(
                 new lib.Popup().setText(

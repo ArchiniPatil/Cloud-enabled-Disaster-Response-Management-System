@@ -322,6 +322,9 @@ test("server-driven queue filters, supplementary updates and empty states work w
   await citizen
     .getByRole("button", { name: "Add update", exact: true })
     .click();
+  // The saved update can render before the existing tracking refresh finishes.
+  // Wait for the form's successful completion before asserting its saved text.
+  await expect(citizen.getByLabel("Add information")).toHaveValue("");
   await expect(
     citizen.getByText("Controlled exercise: use the east entrance", {
       exact: true,

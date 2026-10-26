@@ -1,3 +1,4 @@
+import { PresentationTable } from "./ui-feedback";
 import { useState } from "react";
 import { useData } from "./hooks";
 import { label } from "./api";
@@ -71,7 +72,7 @@ export function OperationalMetrics() {
           </section>
           <section className="panel table-wrap">
             <h2>Team workload</h2>
-            <table>
+            <PresentationTable>
               <thead>
                 <tr>
                   <th>Team</th>
@@ -92,11 +93,11 @@ export function OperationalMetrics() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PresentationTable>
           </section>
           <section className="panel table-wrap">
             <h2>Current resource utilization</h2>
-            <table>
+            <PresentationTable>
               <thead>
                 <tr>
                   <th>Resource</th>
@@ -115,7 +116,7 @@ export function OperationalMetrics() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PresentationTable>
           </section>
           <small>Updated {new Date(data.asOf).toLocaleString()}</small>
         </>

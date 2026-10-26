@@ -1,3 +1,4 @@
+import { tokenColor } from "./visual-tokens";
 import { useEffect, useRef, useState } from "react";
 import type * as MapLibre from "maplibre-gl";
 import { useData } from "./hooks";
@@ -26,7 +27,10 @@ export function ResourceMap() {
           const point: [number, number] = [r.longitude, r.latitude];
           bounds.extend(point);
           new lib.Marker({
-            color: r.status === "AVAILABLE" ? "#24564c" : "#999",
+            color:
+              r.status === "AVAILABLE"
+                ? tokenColor("teal")
+                : tokenColor("muted"),
           })
             .setLngLat(point)
             .setPopup(new lib.Popup().setText(`${r.name}: ${label(r.status)}`))

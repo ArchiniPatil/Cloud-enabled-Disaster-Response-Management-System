@@ -1,0 +1,95 @@
+/* Calm field operations. All application colour values live here. */
+:root {
+  color-scheme: light dark;
+  --paper: #f3f0e8;
+  --surface: #fffcf6;
+  --surface-raised: #ffffff;
+  --surface-muted: #eae6dc;
+  --ink: #282a25;
+  --muted: #62645b;
+  --line: #cac8bc;
+  --sidebar: #242e29;
+  --sidebar-hover: #35433b;
+  --sidebar-text: #f8f5eb;
+  --sidebar-muted: #c0c7bc;
+  --accent: #b43820;
+  --accent-hover: #962c18;
+  --on-accent: #ffffff;
+  --teal: #246354;
+  --teal-bg: #e0eee6;
+  --critical: #a32e21;
+  --critical-bg: #fbe4da;
+  --warning: #79500b;
+  --warning-bg: #f7eac4;
+  --ok: #285e43;
+  --ok-bg: #e0ecdd;
+  --info: #285e62;
+  --info-bg: #e0eceb;
+  --focus: #a73520;
+  --shadow-color: #282a2514;
+  --scrim: #161c28a6;
+  --texture: #62645b16;
+  --font-heading:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-body: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.65rem;
+  --text-2xl: clamp(1.9rem, 3vw, 2.7rem);
+  --text-display: clamp(2.8rem, 5.2vw, 5rem);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-pill: 999px;
+  --shadow: 0 3px 10px var(--shadow-color);
+  --shadow-raised: 0 14px 36px var(--shadow-color);
+  --duration-fast: 150ms;
+  --duration: 240ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* Compatibility aliases for existing structural styles. */
+  --navy: var(--sidebar);
+  --navy-deep: var(--sidebar);
+  --coral: var(--critical);
+  --space: var(--space-2);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1c211e;
+    --surface: #252c27;
+    --surface-raised: #303a32;
+    --surface-muted: #323b33;
+    --ink: #f2eee3;
+    --muted: #bfc5b8;
+    --line: #566153;
+    --sidebar: #151c18;
+    --sidebar-hover: #35463b;
+    --sidebar-text: #f8f5eb;
+    --sidebar-muted: #bfcbbd;
+    --accent: #f7a489;
+    --accent-hover: #ffc3ac;
+    --on-accent: #30221b;
+    --teal: #9ed8bf;
+    --teal-bg: #283e34;
+    --critical: #ffb9a7;
+    --critical-bg: #4c2b25;
+    --warning: #f1d088;
+    --warning-bg: #453b25;
+    --ok: #b2dfac;
+    --ok-bg: #2b3e2d;
+    --info: #acd8d4;
+    --info-bg: #273d3c;
+    --focus: #f7b18c;
+    --shadow-color: #00000038;
+    --texture: #c0c7bc12;
+  }
+}

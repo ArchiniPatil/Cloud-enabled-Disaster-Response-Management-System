@@ -1,5 +1,18 @@
 # Test commands and actual results
 
+## Local UI release — 26 October 2026
+
+The final source passes ESLint, TypeScript, production build and **47 unit/integration tests** (2 files). A clean combined Playwright run passes **11 scenarios** (the existing 7 workflows plus 4 presentation checks), with none skipped. `npm run setup:demo` again passed frozen installation, Docker database startup, migrations and seed. `npm run dev:demo`, `doctor:local` and `smoke:local` also passed: all three local ports, database readiness, fixture session, scoped report query and logout. Four final light/dark desktop/mobile screenshots are in `docs/design-previews/`. These checks ran on Linux/Chromium; native Windows remains unverified.
+
+Each requested design stage (tokens/sign-in, shell, shared pages) passed build, the 47-test suite and the existing seven browser workflows before the final combined checks. The added browser checks cover remembered sidebar collapse, keyboard shortcuts/dialog, notification disclosure, stable row sorting, 360px light/dark layouts across the main views, reduced motion, persistent emergency notice and 4.5:1 contrast for the authored token pairs. This is targeted accessibility evidence, not full accessibility certification.
+
+Testing found and fixed mobile overflow from long incident filters and admin dropdowns. The new test initially measured a table before its account rows loaded and matched only part of the banner's combined text; it now waits for actual account data and checks the existing banner. A pre-existing supplementary-update assertion could observe the saved paragraph before the textarea reset after tracking refresh; the original assertion is preserved and now waits for the form's successful clearing first. No tests or assertions were removed.
+
+The complete rapid page traversal also exhausted the normal per-user request limit. Playwright's managed server now explicitly uses the **existing NODE_ENV=test limits** and the local notification simulator. Application/default local/production limits are unchanged; this suite does not validate production throughput limits. Stop an existing dev server before testing, or use `CI=1` on Linux to require the managed server. The final 11-pass run used a fresh managed server.
+
+Provider maps, local-browser physical GPS, actual email/SMS, hosted authentication and AWS deployment are not claimed as tested. The map fallback and simulated coordinates remain explicit. Earlier Docker/infrastructure/polling checks below describe their recorded releases; this visual update does not imply new live-provider acceptance.
+
+
 ## Latest operational redesign verification
 
 Executed locally on Linux with Node 24, PostgreSQL 16/PostGIS 3.5 and Chromium; the container uses Node 22. No live provider acceptance or native Windows run is claimed.

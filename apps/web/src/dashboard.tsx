@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { AnimatedCount, RetryNotice, UpdatedAt } from "./ui-feedback";
 import { Link } from "react-router-dom";
 import {
   Activity,
@@ -69,8 +71,45 @@ function TeamSnapshot() {
 }
 function AdminSnapshot() {
   const health = useData("/admin/health", 10000);
+  const d = health.data;
+  const services = d
+    ? [
+        {
+          name: "Database",
+          value: d.database,
+          attention: d.database !== "Connected",
+        },
+        {
+          name: "Identity",
+          value: d.authentication,
+          attention: !d.authentication.startsWith("Configured"),
+        },
+        {
+          name: "Pending events",
+          value: `${d.outboxPending} queued`,
+          attention: d.outboxPending > 0,
+        },
+        {
+          name: "Notifications",
+          value: `${d.notificationProblems} problems`,
+          attention: d.notificationProblems > 0,
+        },
+        {
+          name: "Evidence / maps",
+          value: `${d.evidenceConfigured ? "Configured" : "Not configured"} / ${d.mapsConfigured ? "Configured" : "Not configured"}`,
+          attention: !d.evidenceConfigured || !d.mapsConfigured,
+        },
+        {
+          name: "Delivery transport",
+          value: d.notificationTransport,
+          attention: d.notificationTransport
+            .toLowerCase()
+            .includes("test mode"),
+        },
+      ]
+    : [];
   return (
-    <section className="panel">
+    <section className="panel service-oversight">
       <div className="section-heading">
         <h2>Service oversight</h2>
         <Link to="/admin">
@@ -78,41 +117,52 @@ function AdminSnapshot() {
         </Link>
       </div>
       {health.error ? (
-        <p role="alert">{health.error}</p>
-      ) : health.data ? (
-        <div className="integration-grid">
-          <div>
-            <span>Database</span>
-            <strong>{health.data.database}</strong>
+        <RetryNotice
+          title="Service status could not be loaded"
+          message={health.error}
+          retry={health.reload}
+        />
+      ) : d ? (
+        <>
+          <p className="service-summary">
+            <span
+              className={`status-dot ${services.some((s) => s.attention) ? "warning" : "ok"}`}
+            />
+            {services.filter((s) => s.attention).length} of 6 services need
+            attention <small> · configuration or queue review</small>
+          </p>
+          <div className="integration-grid">
+            {services.map((service) => (
+              <div className="service-item" key={service.name}>
+                <span
+                  className={`status-dot ${service.attention ? "warning" : "ok"}`}
+                  aria-hidden="true"
+                />
+                <div>
+                  <span>{service.name}</span>
+                  <strong
+                    className={`service-pill ${service.attention ? "warning" : "ok"}`}
+                  >
+                    {service.value}
+                  </strong>
+                </div>
+              </div>
+            ))}
           </div>
-          <div>
-            <span>Identity</span>
-            <strong>{health.data.authentication}</strong>
-          </div>
-          <div>
-            <span>Pending events</span>
-            <strong>{health.data.outboxPending}</strong>
-          </div>
-          <div>
-            <span>Notification problems</span>
-            <strong>{health.data.notificationProblems}</strong>
-          </div>
-          <div>
-            <span>Evidence / maps</span>
-            <strong>
-              {health.data.evidenceConfigured ? "Configured" : "Not configured"}{" "}
-              / {health.data.mapsConfigured ? "Configured" : "Not configured"}
-            </strong>
-          </div>
-          <div>
-            <span>Delivery transport</span>
-            <strong>{health.data.notificationTransport}</strong>
-          </div>
-        </div>
+        </>
       ) : (
-        <p role="status">Checking application status…</p>
+        <div
+          className="integration-grid skeleton-grid"
+          role="status"
+          aria-label="Checking application status"
+        >
+          {Array.from({ length: 6 }, (_, i) => (
+            <div className="skeleton service-skeleton" key={i} />
+          ))}
+          <span className="sr-only">Checking application status…</span>
+        </div>
       )}
-      <p className="muted">
+      <p className="service-footnote">
         Configured providers require live acceptance checks. Provider
         credentials are managed outside this interface.
       </p>
@@ -126,6 +176,12 @@ export function OperationalDashboard({
   role: string;
   queueOnly?: boolean;
 }) {
+  const [refreshing, setRefreshing] = useState(false),
+    [refreshSlot, setRefreshSlot] = useState<HTMLElement | null>(null);
+  useEffect(
+    () => setRefreshSlot(document.getElementById("dashboard-refresh-slot")),
+    [],
+  );
   const citizen = role === "CITIZEN",
     rescuer = role === "RESCUER";
   const [filters, setFilters] = useState<Record<string, string>>({}),
@@ -169,13 +225,6 @@ export function OperationalDashboard({
     <>
       <header className="page-head">
         <div>
-          <div className="eyebrow">
-            {citizen
-              ? "Citizen services"
-              : rescuer
-                ? "Field response"
-                : "Emergency coordination"}
-          </div>
           <h1>{title}</h1>
           <p>
             {citizen
@@ -192,16 +241,33 @@ export function OperationalDashboard({
               Need help
             </Link>
           )}
-          <button
-            aria-label="Refresh dashboard"
-            onClick={() => {
-              void reports.reload();
-              void summary.reload();
-              void activity.reload();
-            }}
-          >
-            <RefreshCw size={17} />
-          </button>
+          {(() => {
+            const control = (
+              <div className="refresh-control">
+                <UpdatedAt value={reports.data?.asOf} />
+                <button
+                  aria-label="Refresh dashboard"
+                  aria-busy={refreshing}
+                  disabled={refreshing}
+                  onClick={async () => {
+                    setRefreshing(true);
+                    try {
+                      await Promise.all([
+                        reports.reload(),
+                        summary.reload(),
+                        activity.reload(),
+                      ]);
+                    } finally {
+                      setRefreshing(false);
+                    }
+                  }}
+                >
+                  <RefreshCw size={17} className={refreshing ? "spin" : ""} />
+                </button>
+              </div>
+            );
+            return refreshSlot ? createPortal(control, refreshSlot) : control;
+          })()}
         </div>
       </header>
       {!queueOnly && citizen && (
@@ -233,25 +299,22 @@ export function OperationalDashboard({
           ["unassigned", "Unassigned / active"],
           ["resolved", "Resolved"],
         ].map(([key, name]) => (
-          <div className={`ops-stat ${key}`} key={key}>
+          <div
+            className={`ops-stat ${key} ${key === "critical" && summary.data?.[key] > 0 ? "has-critical" : ""} ${!summary.data && !summary.error ? "skeleton" : ""}`}
+            key={key}
+          >
             <span>{name}</span>
-            <strong>{summary.data?.[key] ?? "—"}</strong>
+            <AnimatedCount value={summary.data?.[key]} />
             <small>In your authorized scope</small>
           </div>
         ))}
       </div>
       {(reports.error || summary.error) && (
-        <div role="alert" className="notice error">
-          {reports.error || summary.error}{" "}
-          <button
-            onClick={() => {
-              void reports.reload();
-              void summary.reload();
-            }}
-          >
-            Retry
-          </button>
-        </div>
+        <RetryNotice
+          title="Incident dashboard could not refresh"
+          message={reports.error || summary.error}
+          retry={() => Promise.all([reports.reload(), summary.reload()])}
+        />
       )}
       {!citizen &&
         (summary.data?.critical_unassigned > 0 ||
@@ -419,7 +482,21 @@ export function OperationalDashboard({
                   : "New incidents in your scope will appear automatically."}{" "}
                 Try clearing filters.
               </p>
-              {citizen && <Link to="/report">Create a report</Link>}
+              {citizen ? (
+                <Link to="/report" className="button">
+                  Create a report
+                </Link>
+              ) : (
+                <button
+                  onClick={() => {
+                    setFilters({});
+                    setSearch("");
+                    setOffset(0);
+                  }}
+                >
+                  Show all authorized incidents
+                </button>
+              )}
             </div>
           )}
           <div className="operational-queue">

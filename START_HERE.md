@@ -2,6 +2,8 @@
 
 This is the complete source repository: React frontend, Express backend, PostgreSQL/PostGIS schema, role and dispatch workflows, tests, Docker image, and AWS CDK infrastructure. The application has passed local tests. **The AWS stack has not been deployed or live-validated.** Real sign-in requires Cognito; S3 evidence, AWS maps/routes, queues and analytics require the corresponding AWS resources.
 
+For the current local-first release, start with [LOCAL_TEST_WALKTHROUGH.md](LOCAL_TEST_WALKTHROUGH.md): short Windows folder path, four-role sample values, browser test-location setup, troubleshooting and persistence. The [design guide](DESIGN.md) documents the visual changes.
+
 ## 1. Download the whole project
 
 [Download the ZIP](https://github.com/ArchiniPatil/Cloud-enabled-Disaster-Response-Management-System/archive/refs/heads/main.zip), then right-click it → **Extract All**. In VS Code, choose **File → Open Folder** and select the extracted folder that directly contains `package.json`, `apps`, `infra`, and this file. Do not open only `apps/web`, and do not run commands inside the ZIP.

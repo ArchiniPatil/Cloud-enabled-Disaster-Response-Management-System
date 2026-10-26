@@ -1,8 +1,16 @@
 # Implementation status
 
-Updated with the operational redesign on 25 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
+Updated 26 October 2026. The repository was initially empty. **The core application is implemented and locally verified; no AWS resources have been provisioned and no public deployment URL exists.** Do not interpret local fixtures or SDK stubs as live AWS testing.
 
 **Current user constraints:** academic demonstration with test users; $0 cash budget; no custom domain. User reports a Free plan with $120 credits and 169 days remaining. A concrete one-day credit-funded plan is in `ACADEMIC_DEMO.md`; the user has now instructed deployment within the reviewed 24-hour/$30-credit scope. Approval and administrator/budget email are recorded. Live STS and the Free Tier API now confirm access and an ACTIVE FREE plan with $120 credits, expiring 10 April 2027. An AWS Organizations SCP explicitly denies CloudFormation inventory, blocking deployment. The cash-funded reference stays blocked.
+
+## Local laptop UI release
+
+The integrated frontend/API/PostgreSQL/worker workflow remains locally runnable with `setup:demo` / `dev:demo`. [LOCAL_TEST_WALKTHROUGH.md](../LOCAL_TEST_WALKTHROUGH.md) supplies exact Windows commands, four-role access, test coordinates/values, dispatch/completion checks, stock allocation, restart/persistence and troubleshooting. `doctor:local` performs read-only setup diagnostics. The downloadable archive uses the short `Response/` root to avoid deeply nested Windows paths.
+
+The warm light/dark visual system adds a labelled illustrative sign-in timeline, compact identity disclosure, persistent emergency notice, remembered collapsible navigation, mobile bottom bar, keyboard shortcuts, notification preview, refresh/count feedback, six-service oversight grid, visible-row table sorting, skeletons and dismissible feedback. See [DESIGN.md](../DESIGN.md) for file ownership and deliberately deferred provider/logic changes. No backend, database, permission or Cognito-flow rewrite was made in this pass.
+
+Final validation: **47 unit/integration tests and 11 browser scenarios passed**, plus lint, TypeScript, production build and repeated local setup. Native Windows and live AWS remain unverified. The normal login button still requires Cognito; the AWS-free local walkthrough deliberately uses labelled fixture identities. Maps, evidence and external sends still require the configured providers.
 
 ## Operational redesign
 
@@ -36,7 +44,7 @@ Local SMS/email processing uses an explicitly labelled simulator with no externa
 |---|---|---|
 | TypeScript, ESLint, production build | Passed | Local source and frontend/API bundles |
 | Unit + integration suite | 47 tests passed | Real PostgreSQL/PostGIS plus explicitly stubbed AWS provider contracts |
-| Playwright browser suite | 7 scenarios passed with SSE and polling | Full role lifecycle, mobile GPS/layout, admin management, queue filters/supplements, visible login errors, revocation and missing-provider states |
+| Playwright browser suite | 11 scenarios passed with SSE; 7 polling scenarios passed in the preceding release | Full role lifecycle, mobile GPS/layout, admin management, queue filters/supplements, visible login errors, revocation and missing-provider states |
 | Docker image build + smoke | Passed | Node 22 container, health/readiness, cookie identity, database-backed scoped request |
 | CDK synthesis and security assertions | Passed | Local CloudFormation structure; no account API deployment |
 | SES + pipeline + analytics variant synthesis | Passed | Scoped SES worker sender grant and optional pipeline verified; resources not provisioned |

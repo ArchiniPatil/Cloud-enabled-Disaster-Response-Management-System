@@ -1,3 +1,4 @@
+import { tokenColor } from "./visual-tokens";
 import { useEffect, useRef, useState } from "react";
 import type * as MapLibre from "maplibre-gl";
 import { api } from "./api";
@@ -34,7 +35,10 @@ export function LocationPicker({
           zoom: 1,
           transformRequest: (url) => ({ url, credentials: "include" }),
         });
-        marker.current = new lib.Marker({ color: "#b4503c", draggable: true });
+        marker.current = new lib.Marker({
+          color: tokenColor("accent"),
+          draggable: true,
+        });
         const select = (lat: number, lon: number) => {
           marker.current!.setLngLat([lon, lat]).addTo(map.current!);
           pick.current(lat, ((((lon + 180) % 360) + 360) % 360) - 180);

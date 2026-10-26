@@ -98,3 +98,7 @@ See [implementation status](docs/IMPLEMENTATION_STATUS.md) for exact tested, unv
 ## Operational interface update
 
 See the [completion report](docs/REDESIGN_REPORT.md) for role dashboards, priority queues, reporting and outcome records, authentication fixes, notification simulation and validation results. Start in VS Code with [START_HERE.md](START_HERE.md); deploy using the [PowerShell AWS guide](docs/AWS_WINDOWS_DEPLOYMENT.md). Local fixtures are explicitly accessed through Development / Demo Mode, never through production sign-in.
+
+## Local laptop release
+
+Use [LOCAL_TEST_WALKTHROUGH.md](LOCAL_TEST_WALKTHROUGH.md) for exact Windows commands, fixture logins, sample incident values and the citizen → authority → rescuer exercise. [DESIGN.md](DESIGN.md) records the warm light/dark interface, keyboard/navigation behaviour and the provider features intentionally left for AWS configuration.

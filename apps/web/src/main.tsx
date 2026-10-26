@@ -1,3 +1,5 @@
+import { tokenColor, syncBrowserTheme } from "./visual-tokens";
+import { PresentationTable, StatusToasts } from "./ui-feedback";
 import React, {
   useState,
   useEffect,
@@ -37,12 +39,22 @@ import {
   ArrowLeft,
   Navigation,
   LogOut,
+  Phone,
+  Info,
+  RefreshCw,
+  KeyRound,
+  Building2,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import type * as MapLibre from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { api, post, setCsrf, label, ApiError } from "./api";
 import { etaLabel, locationState } from "../../../packages/core/src/domain";
+import "./tokens.css";
 import "./styles.css";
+import { ResponseIllustration } from "./presentation";
+import { ShellInteractions, useSidebarPreference } from "./shell-interactions";
 import "./operations.css";
 import { OperationalDashboard } from "./dashboard";
 import { OperationalMetrics } from "./metrics";
@@ -116,7 +128,7 @@ function PageHead({
   return (
     <header className="page-head">
       <div>
-        <div className="eyebrow">{eyebrow ?? "Response coordination"}</div>
+        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>
@@ -125,6 +137,7 @@ function PageHead({
   );
 }
 function App() {
+  useEffect(syncBrowserTheme, []);
   const [user, setUser] = useState<User | null>(null),
     [loading, setLoading] = useState(true),
     [mode, setMode] = useState(""),
@@ -245,42 +258,21 @@ function Landing() {
       </header>
       <main className="entry-content">
         <div className="entry-intro">
-          <div className="eyebrow">Report · Coordinate · Respond</div>
-          <h1>Disaster Response and Management System</h1>
+          <p className="entry-purpose">For the people who respond.</p>
+          <h1>
+            Disaster <em>Response</em> and Management System
+          </h1>
           <p>
             A shared workspace for citizen reports, authorized dispatch and
             accountable field response.
           </p>
-          <div className="entry-features">
-            <div>
-              <ClipboardList />
-              <span>
-                <strong>Report with clarity</strong>Share the location, hazards
-                and assistance needed.
-              </span>
-            </div>
-            <div>
-              <Users />
-              <span>
-                <strong>Coordinate the response</strong>Assign qualified teams
-                with clear ownership.
-              </span>
-            </div>
-            <div>
-              <Activity />
-              <span>
-                <strong>Follow every update</strong>Keep acceptance, dispatch
-                and arrival distinct.
-              </span>
-            </div>
-          </div>
-          <EmergencyFallback />
+          <ResponseIllustration />
         </div>
         <section
           className="entry-card"
           aria-label={development ? "Development access" : "Sign in"}
         >
-          <ShieldCheck className="entry-symbol" size={32} />
+          <KeyRound className="entry-symbol" size={28} />
           <h2>
             {development
               ? "Development / Demo Mode"
@@ -348,19 +340,41 @@ function Landing() {
                   <button className="primary full-width" disabled>
                     Sign in
                   </button>
-                  <div className="notice">
-                    {mode === "unavailable"
-                      ? "The backend is unavailable. Start the application and retry."
-                      : "Cognito sign-in is not configured in this environment. An administrator must configure the identity provider before normal sign-in and citizen registration are available."}
+                  <div className="identity-notice" role="status">
+                    <Info size={18} aria-hidden="true" />
+                    <div>
+                      <strong>
+                        {mode === "unavailable"
+                          ? "Connection unavailable"
+                          : "Sign-in needs configuration"}
+                      </strong>
+                      <details>
+                        <summary>Details</summary>
+                        <p>
+                          {mode === "unavailable"
+                            ? "The backend is unavailable. Start the application and retry."
+                            : "Cognito sign-in is not configured in this environment. An administrator must configure the identity provider before normal sign-in and citizen registration are available."}
+                        </p>
+                      </details>
+                    </div>
                   </div>
-                  <button onClick={() => window.location.reload()}>
-                    Retry connection
+                  <button
+                    className="quiet-button"
+                    aria-busy={busy}
+                    disabled={busy}
+                    onClick={() => {
+                      setBusy(true);
+                      window.location.reload();
+                    }}
+                  >
+                    <RefreshCw size={16} className={busy ? "spin" : ""} /> Retry
+                    connection
                   </button>
                 </>
               )}
               {mode === "demo" && (
                 <div className="development-link">
-                  <span>Local development tools</span>
+                  <span>Development only</span>
                   <Link to="/development">
                     Open Development / Demo Mode <ChevronRight size={16} />
                   </Link>
@@ -370,6 +384,9 @@ function Landing() {
           )}
         </section>
       </main>
+      <div className="entry-emergency">
+        <EmergencyFallback />
+      </div>
       <footer className="entry-footer">
         A coordination platform. A submitted report does not guarantee
         acceptance or dispatch by emergency services.
@@ -400,6 +417,8 @@ function Protected({
 }
 function Shell() {
   const { user } = useContext(Session);
+  const { collapsed, toggle } = useSidebarPreference();
+  const currentLocation = useLocation();
   const citizen = user!.role === "CITIZEN";
   const notifications = useData("/notifications", 10000);
   const links: [string, string, React.ReactNode][] = [
@@ -411,7 +430,7 @@ function Shell() {
     ],
     ["/announcements", "Announcements", <Bell size={19} />],
     ["/situation", "Local situation", <MapPin size={19} />],
-    ["/resource-map", "Shelters & resources", <MapPin size={19} />],
+    ["/resource-map", "Shelters & resources", <Building2 size={19} />],
   ];
   if (!citizen)
     links.push(["/teams", "Teams & resources", <Users size={19} />]);
@@ -420,7 +439,7 @@ function Shell() {
   if (user!.role === "ADMIN")
     links.push(["/admin", "Administration", <Settings size={19} />]);
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
@@ -431,13 +450,36 @@ function Shell() {
             response<span className="brand-dot">.</span>
           </span>
         </Link>
+        <button
+          className="sidebar-toggle"
+          aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-expanded={!collapsed}
+          onClick={toggle}
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={20} />
+          ) : (
+            <PanelLeftClose size={20} />
+          )}
+        </button>
         <div className="workspace-label">{label(user!.role)} workspace</div>
-        <nav>
-          {links.map(([to, title, icon]) => (
-            <NavLink key={to} to={to} end={to === "/"}>
-              {icon}
-              {title}
-            </NavLink>
+        <nav aria-label="Main navigation">
+          {links.map(([to, title, icon], index) => (
+            <React.Fragment key={to}>
+              {(index === 0 || to === "/announcements" || to === "/teams") && (
+                <span className="nav-group">
+                  {index === 0
+                    ? "Workspace"
+                    : to === "/announcements"
+                      ? "Community"
+                      : "Coordination"}
+                </span>
+              )}
+              <NavLink to={to} end={to === "/"} viewTransition title={title}>
+                {icon}
+                <span className="nav-text">{title}</span>
+              </NavLink>
+            </React.Fragment>
           ))}
         </nav>
         <div className="sidebar-bottom">
@@ -449,7 +491,12 @@ function Shell() {
               <span>Every action is accountable.</span>
             </p>
           </div>
-          <NavLink to="/profile" className="profile-link">
+          <NavLink
+            to="/profile"
+            viewTransition
+            className="profile-link"
+            title="Profile & settings"
+          >
             <span className="avatar">{user!.name[0]}</span>
             <span>
               {user!.name.split(" — ")[0]}
@@ -461,21 +508,34 @@ function Shell() {
       </aside>
       <div className="main-column">
         <div className="topbar">
-          <span className="workspace-path">
-            RESPONSE / <strong>{label(user!.role)}</strong>
-          </span>
-          <Link
-            to="/notifications"
-            className="icon-button"
-            aria-label="Notifications"
-          >
-            <Bell size={20} />
-            {!!notifications.data?.unread && (
-              <span className="notification-count">
-                {notifications.data.unread}
+          <div className="workspace-path">
+            <span className="workspace-dot" />
+            {label(user!.role)} workspace
+            {currentLocation.pathname.split("/").filter(Boolean).length > 1 && (
+              <span className="compact-breadcrumb">
+                {" "}
+                / <Link to="/reports">Reports</Link> / Incident
               </span>
             )}
-          </Link>
+          </div>
+          <div className="topbar-actions">
+            <div id="dashboard-refresh-slot" />
+            <ShellInteractions notifications={notifications.data} />
+
+            <Link
+              to="/notifications"
+              className="icon-button"
+              aria-label="Notifications"
+              title="Open notification centre"
+            >
+              <ArrowUpRight size={20} />
+              {!!notifications.data?.unread && (
+                <span className="notification-count">
+                  {notifications.data.unread}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
         <main id="main-content" tabIndex={-1}>
           <Routes>
@@ -522,6 +582,7 @@ function Shell() {
             />
           </Routes>
         </main>
+        <StatusToasts />
         <footer className="app-footer">
           <span>Cloud-enabled disaster coordination</span>
           <span>Submission ≠ acceptance ≠ dispatch ≠ arrival</span>
@@ -538,7 +599,7 @@ function EmergencyFallback() {
   const { data } = useData("/auth/config");
   return (
     <div className="fallback">
-      <AlertTriangle size={19} />
+      <Phone size={22} aria-hidden="true" />
       <p>
         <strong>In immediate danger?</strong>{" "}
         {data?.emergencyPhone ? (
@@ -1358,13 +1419,16 @@ function Tracking({ data, error }: { data: any; error: string }) {
           zoom: 12,
           transformRequest: (url) => ({ url, credentials: "include" }),
         });
-        new maplibregl.Marker({ color: "#b4503c" })
+        new maplibregl.Marker({ color: tokenColor("accent") })
           .setLngLat([data.incident.longitude, data.incident.latitude])
           .addTo(map);
         for (const t of data.teams)
           if (t.longitude != null)
             new maplibregl.Marker({
-              color: t.tracking === "LIVE" ? "#24564c" : "#999",
+              color:
+                t.tracking === "LIVE"
+                  ? tokenColor("teal")
+                  : tokenColor("muted"),
             })
               .setLngLat([t.longitude, t.latitude])
               .addTo(map);
@@ -1605,7 +1669,7 @@ function Teams() {
         <h2>Resource inventory</h2>
       </div>
       <div className="panel table-wrap">
-        <table>
+        <PresentationTable>
           <thead>
             <tr>
               <th>Resource</th>
@@ -1628,7 +1692,7 @@ function Teams() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </PresentationTable>
       </div>
     </>
   );
@@ -2121,7 +2185,7 @@ function Admin() {
             </button>
           </form>
           <div className="panel table-wrap">
-            <table>
+            <PresentationTable>
               <thead>
                 <tr>
                   <th>Name</th>
@@ -2194,7 +2258,7 @@ function Admin() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PresentationTable>
           </div>
         </>
       )}
@@ -2264,7 +2328,7 @@ function Admin() {
       )}
       {tab === "Audit" && (
         <div className="panel table-wrap">
-          <table>
+          <PresentationTable>
             <thead>
               <tr>
                 <th>When</th>
@@ -2285,7 +2349,7 @@ function Admin() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </PresentationTable>
         </div>
       )}
       {tab === "Health" && <NotificationJobs />}
