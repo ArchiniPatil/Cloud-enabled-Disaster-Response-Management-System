@@ -1,0 +1,251 @@
+{
+  "archive": "Response-2026.10.31-rc1.zip",
+  "sha256": "e92f746266ccb3ce817aeb58e75c822fc04b7d3248b47458914c373872ee1507",
+  "bytes": 834904,
+  "date": "2026-10-31",
+  "environment": "Linux x86_64; Node 24.19.0; PostgreSQL 16/PostGIS 3.5; Chromium; no live AWS",
+  "counts": {
+    "targeted": "219/219",
+    "full": "272/272",
+    "browser": "21/21"
+  },
+  "results": {
+    "install": {
+      "command": [
+        "npm",
+        "ci",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 13.57,
+      "status": "PASS"
+    },
+    "dependency-tree": {
+      "command": [
+        "npm",
+        "ls",
+        "--all"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.62,
+      "status": "PASS"
+    },
+    "test-databases": {
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import pg from 'pg';const p=new pg.Pool({connectionString:'postgresql://response:local-development-only@127.0.0.1:5432/postgres'});for(const n of [\"response_task4_final_test\", \"response_task4_final_browser_test\"]){if(!(await p.query('SELECT 1 FROM pg_database WHERE datname=$1',[n])).rowCount)await p.query('CREATE DATABASE '+n);}await p.end();"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.37,
+      "status": "PASS"
+    },
+    "public-rds-ca": {
+      "command": [
+        "node",
+        "scripts/fetch-rds-ca.mjs"
+      ],
+      "environment": {
+        "NODE_USE_ENV_PROXY": "1"
+      },
+      "exitCode": 0,
+      "seconds": 0.82,
+      "status": "PASS"
+    },
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 9.05,
+      "status": "PASS"
+    },
+    "infra-academic": {
+      "command": [
+        "node",
+        "node_modules/aws-cdk/bin/cdk",
+        "synth",
+        "--app",
+        "node --import tsx infra/app.ts",
+        "--lookups=false",
+        "--quiet",
+        "-c",
+        "offlinePreview=true",
+        "--output",
+        "cdk.out/task4-academic",
+        "-c",
+        "hosting=academic"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 19.86,
+      "status": "PASS"
+    },
+    "assert-academic": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/verify-infra.ts",
+        "cdk.out/task4-academic/DisasterResponse-academic.template.json"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.54,
+      "status": "PASS"
+    },
+    "typecheck": {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 31.75,
+      "status": "PASS"
+    },
+    "infra-reference": {
+      "command": [
+        "node",
+        "node_modules/aws-cdk/bin/cdk",
+        "synth",
+        "--app",
+        "node --import tsx infra/app.ts",
+        "--lookups=false",
+        "--quiet",
+        "-c",
+        "offlinePreview=true",
+        "--output",
+        "cdk.out/task4-reference"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 14.0,
+      "status": "PASS"
+    },
+    "assert-reference": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/verify-infra.ts",
+        "cdk.out/task4-reference/DisasterResponse-dev.template.json"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.3,
+      "status": "PASS"
+    },
+    "build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 37.67,
+      "status": "PASS"
+    },
+    "infra-receipts": {
+      "command": [
+        "node",
+        "node_modules/aws-cdk/bin/cdk",
+        "synth",
+        "--app",
+        "node --import tsx infra/app.ts",
+        "--lookups=false",
+        "--quiet",
+        "-c",
+        "offlinePreview=true",
+        "--output",
+        "cdk.out/task4-receipts",
+        "-c",
+        "hosting=academic",
+        "-c",
+        "smsDeliveryLogs=sns/ap-south-1/123456789012/DirectPublishToPhoneNumber"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 8.5,
+      "status": "PASS"
+    },
+    "assert-receipts": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/verify-infra.ts",
+        "cdk.out/task4-receipts/DisasterResponse-academic.template.json"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.17,
+      "status": "PASS"
+    },
+    "targeted": {
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/workflow.test.ts",
+        "tests/readiness.test.ts",
+        "tests/readiness-timeout.test.ts",
+        "tests/configuration.test.ts",
+        "tests/local-access.test.ts",
+        "tests/local-access-metadata.test.ts"
+      ],
+      "environment": {
+        "TEST_DATABASE_URL": "postgresql://response:local-development-only@127.0.0.1:5432/response_task4_final_test"
+      },
+      "exitCode": 0,
+      "seconds": 76.89,
+      "status": "PASS"
+    },
+    "full": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "environment": {
+        "TEST_DATABASE_URL": "postgresql://response:local-development-only@127.0.0.1:5432/response_task4_final_test"
+      },
+      "exitCode": 0,
+      "seconds": 54.71,
+      "status": "PASS"
+    },
+    "browser": {
+      "command": [
+        "npm",
+        "run",
+        "test:e2e"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgresql://response:local-development-only@127.0.0.1:5432/response_task4_final_browser_test",
+        "APP_ORIGIN": "http://localhost:5173",
+        "API_ORIGIN": "http://localhost:4000",
+        "CI": "1"
+      },
+      "exitCode": 0,
+      "seconds": 167.94,
+      "status": "PASS"
+    }
+  },
+  "passed": true,
+  "notTested": [
+    "native Windows",
+    "live AWS/Cognito/S3/Location/SMS/email",
+    "physical GPS/background devices",
+    "production load/failover",
+    "live RDS restore"
+  ]
+}
