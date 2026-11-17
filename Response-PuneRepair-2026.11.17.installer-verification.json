@@ -1,0 +1,68 @@
+{
+  "passed": true,
+  "environment": "Linux; native Windows NOT RUN",
+  "results": [
+    {
+      "check": "installer-migrate",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 1.47,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-seed-baseline",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 0.52,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-existing-four-account-data",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 0.16,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-apply",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 19.72,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-restore-owned-test-db",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 1.07,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-repeat",
+      "exit": 0,
+      "expectedExit": 0,
+      "seconds": 13.28,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-refuses-running-app",
+      "exit": 1,
+      "expectedExit": 1,
+      "seconds": 0.06,
+      "status": "PASS"
+    },
+    {
+      "check": "installer-refuses-customized-source",
+      "exit": 1,
+      "expectedExit": 1,
+      "seconds": 0.06,
+      "status": "PASS"
+    }
+  ],
+  "existingRowsPreserved": true,
+  "backupRestoredAndCompared": true,
+  "repeatPreservedRows": true,
+  "updaterSha256": "898e678fc3f4319ffa14836a39e495e88cdb63960ce695fca9cc03fed29244ff",
+  "date": "2026-11-17",
+  "initialHarnessFailure": "First disposable data setup omitted required incident kind (SQLSTATE 23502). Fixed only the harness fixture; retry passed. No schema, application constraint or test assertion was weakened."
+}

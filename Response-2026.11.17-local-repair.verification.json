@@ -1,0 +1,253 @@
+{
+  "archive": "Response-2026.11.17-local-repair.zip",
+  "sha256": "94c955bde12cd79ecf9e21fa32a69a836fd01a8de95f77e53fd710b9bd8d56d1",
+  "bytes": 872105,
+  "date": "2026-11-17",
+  "environment": "Linux x86_64; Node 24.19.0; PostgreSQL 16/PostGIS 3.5; Chromium; no live AWS",
+  "counts": {
+    "targeted": "245/245",
+    "full": "298/298",
+    "browser": "24/24"
+  },
+  "results": {
+    "install": {
+      "command": [
+        "npm",
+        "ci",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 14.61,
+      "status": "PASS"
+    },
+    "dependency-tree": {
+      "command": [
+        "npm",
+        "ls",
+        "--all"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.52,
+      "status": "PASS"
+    },
+    "test-databases": {
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import pg from 'pg';const p=new pg.Pool({connectionString:'postgresql://response:local-development-only@127.0.0.1:5432/postgres'});for(const n of [\"response_pune_release_final_test\", \"response_pune_release_final_browser_test\"]){if(!(await p.query('SELECT 1 FROM pg_database WHERE datname=$1',[n])).rowCount)await p.query('CREATE DATABASE '+n);}await p.end();"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.21,
+      "status": "PASS"
+    },
+    "public-rds-ca": {
+      "command": [
+        "node",
+        "scripts/fetch-rds-ca.mjs"
+      ],
+      "environment": {
+        "NODE_USE_ENV_PROXY": "1"
+      },
+      "exitCode": 0,
+      "seconds": 0.87,
+      "status": "PASS"
+    },
+    "lint": {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 10.02,
+      "status": "PASS"
+    },
+    "infra-academic": {
+      "command": [
+        "node",
+        "node_modules/aws-cdk/bin/cdk",
+        "synth",
+        "--app",
+        "node --import tsx infra/app.ts",
+        "--lookups=false",
+        "--quiet",
+        "-c",
+        "offlinePreview=true",
+        "--output",
+        "cdk.out/task4-academic",
+        "-c",
+        "hosting=academic"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 18.24,
+      "status": "PASS"
+    },
+    "assert-academic": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/verify-infra.ts",
+        "cdk.out/task4-academic/DisasterResponse-academic.template.json"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.52,
+      "status": "PASS"
+    },
+    "typecheck": {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 32.07,
+      "status": "PASS"
+    },
+    "infra-reference": {
+      "command": [
+        "node",
+        "node_modules/aws-cdk/bin/cdk",
+        "synth",
+        "--app",
+        "node --import tsx infra/app.ts",
+        "--lookups=false",
+        "--quiet",
+        "-c",
+        "offlinePreview=true",
+        "--output",
+        "cdk.out/task4-reference"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 15.84,
+      "status": "PASS"
+    },
+    "assert-reference": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/verify-infra.ts",
+        "cdk.out/task4-reference/DisasterResponse-dev.template.json"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.28,
+      "status": "PASS"
+    },
+    "build": {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 39.97,
+      "status": "PASS"
+    },
+    "infra-receipts": {
+      "command": [
+        "node",
+        "node_modules/aws-cdk/bin/cdk",
+        "synth",
+        "--app",
+        "node --import tsx infra/app.ts",
+        "--lookups=false",
+        "--quiet",
+        "-c",
+        "offlinePreview=true",
+        "--output",
+        "cdk.out/task4-receipts",
+        "-c",
+        "hosting=academic",
+        "-c",
+        "smsDeliveryLogs=sns/ap-south-1/123456789012/DirectPublishToPhoneNumber"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 14.6,
+      "status": "PASS"
+    },
+    "assert-receipts": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/verify-infra.ts",
+        "cdk.out/task4-receipts/DisasterResponse-academic.template.json"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "seconds": 0.22,
+      "status": "PASS"
+    },
+    "targeted": {
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/demo-pune.test.ts",
+        "tests/demo-fire.test.ts",
+        "tests/workflow.test.ts",
+        "tests/readiness.test.ts",
+        "tests/readiness-timeout.test.ts",
+        "tests/configuration.test.ts",
+        "tests/local-access.test.ts",
+        "tests/local-access-metadata.test.ts"
+      ],
+      "environment": {
+        "TEST_DATABASE_URL": "postgresql://response:local-development-only@127.0.0.1:5432/response_pune_release_final_test"
+      },
+      "exitCode": 0,
+      "seconds": 121.43,
+      "status": "PASS"
+    },
+    "full": {
+      "command": [
+        "npm",
+        "test"
+      ],
+      "environment": {
+        "TEST_DATABASE_URL": "postgresql://response:local-development-only@127.0.0.1:5432/response_pune_release_final_test"
+      },
+      "exitCode": 0,
+      "seconds": 110.01,
+      "status": "PASS"
+    },
+    "browser": {
+      "command": [
+        "npm",
+        "run",
+        "test:e2e"
+      ],
+      "environment": {
+        "DATABASE_URL": "postgresql://response:local-development-only@127.0.0.1:5432/response_pune_release_final_browser_test",
+        "APP_ORIGIN": "http://localhost:5173",
+        "API_ORIGIN": "http://localhost:4000",
+        "CI": "1"
+      },
+      "exitCode": 0,
+      "seconds": 277.83,
+      "status": "PASS"
+    }
+  },
+  "passed": true,
+  "notTested": [
+    "native Windows",
+    "live AWS/Cognito/S3/Location/SMS/email",
+    "physical GPS/background devices",
+    "production load/failover",
+    "live RDS restore"
+  ]
+}
